@@ -13,6 +13,8 @@
    - `wrangler.jsonc`：Worker 名稱 `jushou`，D1 binding 名稱 `DB`、資料庫名稱 `jushou-db`
    - Scripts：`dev`、`build`、`typecheck`、`test`、`lint`（可選）、`deploy`（build → `wrangler d1 migrations apply jushou-db --remote` → `wrangler deploy`）
    - `.gitignore` 包含 `.dev.vars`、`.wrangler/`、`node_modules/`、`dist/`
+   - `.gitattributes`：`* text=auto eol=lf`
+   - 開始前先確認 `node`、`pnpm`、`git`、`gh` 都能用（`gh auth status`）。缺少的話停下來，請使用者照 `docs/cloudflare-setup.md` 第零部分安裝
 
 2. **路由**
    - `/` 學生端：先放一個「輸入加入碼」的畫面（還不用接後端，顯示「功能製作中」即可）
@@ -45,7 +47,7 @@
 使用者會先依 `docs/cloudflare-setup.md` 第一部分完成 `wrangler login`。開始部署前，先跑 `npx wrangler whoami` 確認已登入；若未登入，停下來請使用者照文件操作。
 
 1. `npx wrangler d1 create jushou-db`，把回傳的 `database_id` 填進 `wrangler.jsonc`
-2. 用 `openssl rand -hex 32 | npx wrangler secret put SESSION_SECRET` 設定簽章金鑰（不要把值印出來）
+2. 用 `node -e "process.stdout.write(require('crypto').randomBytes(32).toString('hex'))" | npx wrangler secret put SESSION_SECRET` 設定簽章金鑰（不要把值印出來）
 3. `TEACHER_PASSWORD` **請使用者自己設定**（見 `docs/cloudflare-setup.md` 第二部分），不要替使用者決定密碼
 4. `pnpm run deploy`
 5. 用 curl 確認首頁回 200、未登入呼叫老師 API 回 401

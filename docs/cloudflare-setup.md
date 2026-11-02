@@ -4,6 +4,49 @@
 
 > Cloudflare 後台的按鈕位置偶爾會改版，如果名稱和這裡寫的不完全一樣，找意思相近的就好。
 
+以下所有指令都在 **PowerShell** 執行：開始選單搜尋「PowerShell」或「終端機」打開即可，不需要系統管理員。
+
+---
+
+## 第零部分：確認工具都裝好了（只需做一次）
+
+在 PowerShell 逐行輸入，每行都應該印出版本號：
+
+```powershell
+node --version
+pnpm --version
+git --version
+gh --version
+```
+
+缺哪個就裝哪個（裝完要**關掉 PowerShell 重開**才會生效）：
+
+| 缺少 | 安裝指令 |
+| --- | --- |
+| node | `winget install OpenJS.NodeJS.LTS` |
+| pnpm | `npm install -g pnpm` |
+| gh | `winget install GitHub.cli` |
+
+### 讓 Claude Code 能開 PR
+
+`gh` 裝好後執行一次：
+
+```powershell
+gh auth login
+```
+
+依序選擇：`GitHub.com` → `HTTPS` → 問要不要用 GitHub 帳密驗證 git 選 `Y` → `Login with a web browser`。畫面會顯示一組 8 碼代碼，按 Enter 打開瀏覽器，貼上代碼並授權。完成後 `gh auth status` 會顯示已登入。
+
+### 如果出現「因為這個系統上已停用指令碼執行」
+
+這是 PowerShell 預設擋住 `npx`、`pnpm` 這類指令。執行一次下面這行，輸入 `Y` 確認：
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+只影響你自己的帳號，允許執行本機和已簽章的腳本，是開發者常用的設定。
+
 ---
 
 ## 第一部分：讓電腦登入 Cloudflare（只需做一次，Phase 0 開始前）
@@ -11,22 +54,24 @@
 這一步讓 Claude Code 之後可以用你的帳號建立資料庫、部署網站。
 
 1. 打開瀏覽器到 <https://dash.cloudflare.com>，確認你能登入（你之前用過 Workers，應該已經有帳號）。
-2. 打開你平常跑 Claude Code 的終端機（WSL），切到任何資料夾都可以，輸入：
-   ```
+2. 打開 PowerShell，輸入：
+   ```powershell
+   cd D:\ClaudeCode\jushou
    npx wrangler login
    ```
-   第一次會問要不要安裝 wrangler，輸入 `y` 按 Enter。
-3. 終端機會印出一串網址，並嘗試打開瀏覽器。
-   - 如果瀏覽器**有自動打開**：會看到一個授權頁面，列出 Wrangler 要求的權限，按最下面的 **Allow**。
-   - 如果瀏覽器**沒有打開**（WSL 常見）：把終端機裡那串 `https://dash.cloudflare.com/oauth2/auth?...` 網址整段複製，貼到 Windows 的瀏覽器打開，一樣按 **Allow**。
-4. 瀏覽器顯示授權成功後，回到終端機，應該會看到 `Successfully logged in.`
+   第一次會問要不要安裝 wrangler（`Ok to proceed?`），輸入 `y` 按 Enter。
+3. 瀏覽器會自動打開授權頁面，列出 Wrangler 要求的權限，按最下面的 **Allow**。
+   - 如果瀏覽器沒有自動打開：把 PowerShell 裡那串 `https://dash.cloudflare.com/oauth2/auth?...` 網址整段複製，貼到瀏覽器打開。
+4. 瀏覽器顯示授權成功後，回到 PowerShell，應該會看到 `Successfully logged in.`
 5. 確認：輸入
-   ```
+   ```powershell
    npx wrangler whoami
    ```
    會顯示你的 email 和 Account ID，就完成了。
 
-**如果第 3 步按了 Allow，終端機卻一直卡住沒反應**（WSL 偶爾收不到瀏覽器的回傳），按 `Ctrl + C` 取消，改用下面的「備案：API Token」。
+登入資料存在你的 Windows 使用者帳號下，Claude Code Desktop 執行 wrangler 時會共用，不需要在 Claude Code 裡再登入一次。
+
+**如果第 3 步按了 Allow，PowerShell 卻一直卡住沒反應**（防毒或防火牆偶爾會擋住回傳），按 `Ctrl + C` 取消，改用下面的「備案：API Token」。
 
 ### 備案：API Token
 
@@ -36,13 +81,12 @@
 4. **Account Resources** 選你的帳號；**Zone Resources** 選 `All zones`。
 5. 拉到最下面 **Continue to summary** → **Create Token**。
 6. 畫面會顯示一串 token（**只會顯示這一次**），複製起來。
-7. 回到 WSL 終端機，輸入（把 `貼上token` 換成剛剛那串）：
+7. 回到 PowerShell，輸入（把 `貼上token` 換成剛剛那串，保留前後的雙引號）：
+   ```powershell
+   [Environment]::SetEnvironmentVariable("CLOUDFLARE_API_TOKEN", "貼上token", "User")
    ```
-   echo 'export CLOUDFLARE_API_TOKEN=貼上token' >> ~/.bashrc
-   source ~/.bashrc
-   npx wrangler whoami
-   ```
-   看到 email 就成功了。不要把 token 貼到對話或 repo 裡。
+8. **關掉 PowerShell 重開，並且完全關閉 Claude Code Desktop 再打開**（環境變數只有新開的程式才讀得到）。
+9. 輸入 `npx wrangler whoami`，看到 email 就成功了。不要把 token 貼到對話或 repo 裡。
 
 ---
 
@@ -50,9 +94,12 @@
 
 Claude Code 在 Phase 0 完成時會告訴你「可以設定密碼了」。
 
-1. 在終端機切到專案資料夾（例如 `cd ~/jushou`）。
-2. 輸入：
+1. 打開 PowerShell，切到專案資料夾：
+   ```powershell
+   cd D:\ClaudeCode\jushou
    ```
+2. 輸入：
+   ```powershell
    npx wrangler secret put TEACHER_PASSWORD
    ```
 3. 出現 `Enter a secret value:` 後，輸入你想給媽媽用的密碼（**打字時畫面不會顯示**，這是正常的），按 Enter。

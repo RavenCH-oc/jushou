@@ -58,6 +58,14 @@ migrations/    D1 SQL migrations（0001_xxx.sql 依序編號）
 - UI 文字：繁體中文
 - 回報給使用者的說明、PR 描述、status.md：**白話繁體中文**，短。技術名詞可以用英文，但不要堆砌術語。假設讀者懂程式但不想讀公文
 
+## 開發環境（Windows）
+
+- 使用者在 **Windows** 上用 Claude Code Desktop 開發，專案在 `D:\ClaudeCode\jushou`。沒有 WSL
+- `package.json` 的 scripts 必須在 Windows（cmd）下能跑：不要用 `rm -rf`、`export VAR=`、`cp`、單引號字串、`$(...)` 等 Unix 語法；需要時用 Node 寫小腳本或跨平台套件
+- 產生隨機值用 Node（`node -e "..."`），不要假設有 `openssl`
+- 給使用者自己執行的指令一律寫成 **PowerShell** 語法，並說明要在哪個資料夾執行
+- 換行統一 LF，由 `.gitattributes` 控制；不要提交 CRLF 檔案
+
 ## Git 流程
 
 1. 每個任務開新 branch：`claude/<簡短英文描述>`
