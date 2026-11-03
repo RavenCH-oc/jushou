@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countBlanks, splitAccepted, validateQuestion } from "./questions";
+import { blankContexts, countBlanks, splitAccepted, validateQuestion } from "./questions";
 
 const errorsOf = (raw: unknown) => {
   const r = validateQuestion(raw);
@@ -11,6 +11,11 @@ describe("blanks", () => {
   it("counts runs of 3+ full-width underscores as one blank each", () => {
     expect(countBlanks("甲＿＿＿乙＿＿＿＿＿丙")).toBe(2);
     expect(countBlanks("＿＿ 不算，___ 也不算")).toBe(0);
+  });
+
+  it("shows a few characters around each blank, stopping at neighbouring blanks", () => {
+    expect(blankContexts("子曰學而時習之不亦＿＿＿＿乎")).toEqual(["…習之不亦＿＿＿乎"]);
+    expect(blankContexts("甲＿＿＿乙\n丙＿＿＿")).toEqual(["甲＿＿＿乙 丙…", "…乙 丙＿＿＿"]);
   });
 
   it("splits accepted answers on 、 and new lines", () => {

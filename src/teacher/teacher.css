@@ -227,3 +227,15 @@ a.btn { text-decoration: none; }
   .option-tools > :first-child { flex: 1 1 100%; }
   .option-edit { padding: var(--space-1); }
 }
+
+.field-hint { margin: var(--space-1) 0 0; }
+.blank-context { font-weight: 400; color: var(--text-muted); }
+.warning {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border: 2px solid #b26a00;
+  border-radius: var(--radius);
+  background: #fff6e5;
+  color: #6b3f00;
+  font-weight: 700;
+}

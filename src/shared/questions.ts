@@ -49,6 +49,18 @@ export function countBlanks(text: string) {
   return (text.match(BLANK_RE) ?? []).length;
 }
 
+// A few characters around each blank, so the teacher can see which answer
+// box belongs to which blank: "子曰學而時習之不亦＿＿＿乎" -> ["…習之不亦＿＿＿乎"].
+export function blankContexts(text: string, around = 4) {
+  const flat = text.replace(/\s+/g, " ");
+  const spans = [...flat.matchAll(BLANK_RE)].map((m) => [m.index, m.index + m[0].length]);
+  return spans.map(([start, end], i) => {
+    const from = Math.max(start - around, i > 0 ? spans[i - 1][1] : 0);
+    const to = Math.min(end + around, i < spans.length - 1 ? spans[i + 1][0] : flat.length);
+    return `${from > 0 ? "…" : ""}${flat.slice(from, start)}${BLANK}${flat.slice(end, to)}${to < flat.length ? "…" : ""}`;
+  });
+}
+
 // "甲、乙\n丙" -> ["甲", "乙", "丙"]
 export function splitAccepted(input: string) {
   return input

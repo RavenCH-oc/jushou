@@ -6,6 +6,7 @@ import { QuestionView } from "../student/question-view";
 import { toStudentView, type Answer } from "../shared/grading";
 import {
   BLANK,
+  blankContexts,
   countBlanks,
   MAX_NOTE,
   MAX_OPTION_TEXT,
@@ -90,6 +91,7 @@ function Editor(props: { set: QuestionSetDetail; existing?: Question; type: Ques
   const [showNote, setShowNote] = useState(!!draft.note);
   const [tried, setTried] = useState(false); // show field errors only after the first 儲存
   const [previewAnswer, setPreviewAnswer] = useState<Answer | undefined>(undefined);
+  const [blanksMoved, setBlanksMoved] = useState(false);
   const textRef = useRef<HTMLTextAreaElement>(null);
   const { busy, error, run } = useAction();
 
@@ -137,7 +139,8 @@ function Editor(props: { set: QuestionSetDetail; existing?: Question; type: Ques
     });
   };
 
-  const blankCount = countBlanks(draft.text);
+  const contexts = blankContexts(draft.text);
+  const blankCount = contexts.length;
   const preview = toStudentView({ ...(data as QuestionData), id: "preview", points: Number.isFinite(data.points) ? data.points : 1 });
 
   return (
@@ -164,7 +167,12 @@ function Editor(props: { set: QuestionSetDetail; existing?: Question; type: Ques
               maxLength={MAX_QUESTION_TEXT}
               aria-invalid={!!errors.text}
               value={draft.text}
-              onInput={(e) => update({ text: e.currentTarget.value })}
+              onInput={(e) => {
+                const text = e.currentTarget.value;
+                // Typing or deleting ＿＿＿ by hand doesn't move the answers below.
+                if (countBlanks(text) !== countBlanks(draft.text)) setBlanksMoved(true);
+                update({ text });
+              }}
             />
             <FieldError message={errors.text} />
             {draft.type === "fill" && (
@@ -179,20 +187,24 @@ function Editor(props: { set: QuestionSetDetail; existing?: Question; type: Ques
 
           {showNote ? (
             <div>
-              <label for="q-note">說明（選填）</label>
+              <label for="q-note">給學生的提示（選填）</label>
               <textarea
                 id="q-note"
                 class="field textarea textarea-note"
                 maxLength={MAX_NOTE}
-                placeholder="例如：出處、提示"
+                aria-describedby="q-note-hint"
+                placeholder="例如：想想作者當時的處境"
                 value={draft.note}
                 onInput={(e) => update({ note: e.currentTarget.value })}
               />
+              <p id="q-note-hint" class="muted field-hint">
+                作答時學生就看得到，請不要寫答案
+              </p>
               <FieldError message={errors.note} />
             </div>
           ) : (
             <button type="button" class="link-button" onClick={() => setShowNote(true)}>
-              ＋ 加上說明
+              ＋ 加上給學生的提示
             </button>
           )}
 
@@ -317,9 +329,16 @@ function Editor(props: { set: QuestionSetDetail; existing?: Question; type: Ques
               ) : (
                 <p class="muted">同一格有好幾種可以接受的答案時，用頓號「、」或換行分開。全形半形、前後空白、英文大小寫都不影響對錯。</p>
               )}
-              {Array.from({ length: blankCount }, (_, i) => (
+              {blanksMoved && blankCount > 0 && (
+                <p class="warning" role="status">
+                  空格數量變了，請確認每一格的答案
+                </p>
+              )}
+              {contexts.map((context, i) => (
                 <div key={i}>
-                  <label for={`blank-${i}`}>第 {i + 1} 格</label>
+                  <label for={`blank-${i}`}>
+                    第 {i + 1} 格：<span class="blank-context">{context}</span>
+                  </label>
                   <textarea
                     id={`blank-${i}`}
                     class="field textarea textarea-blank"
