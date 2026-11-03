@@ -99,6 +99,7 @@ export function Rename(props: {
   maxLength: number;
   onSave: (value: string) => Promise<unknown>;
   onClose: () => void;
+  children?: ComponentChildren; // extra actions shown under 取消
 }) {
   const [value, setValue] = useState(props.value);
   const { busy, error, run } = useAction();
@@ -129,6 +130,7 @@ export function Rename(props: {
         <button class="btn btn-secondary btn-block" type="button" onClick={props.onClose}>
           取消
         </button>
+        {props.children}
       </form>
     </Modal>
   );

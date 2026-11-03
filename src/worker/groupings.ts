@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { AppEnv } from "./env";
-import { checkGroupCount, checkGroupingName, checkGroupName, MAX_GROUPING_NAME } from "../shared/limits";
+import { checkGroupCount, checkGroupingName, checkGroupName, MAX_GROUPING_NAME, MAX_GROUPS } from "../shared/limits";
 import { defaultGroupName, groupCountFor, randomGroups } from "../shared/grouping";
 import type { GroupingDetail, GroupingSummary, Student } from "../shared/types";
 import { cryptoRandom, fail, now, readBody } from "./util";
@@ -134,6 +134,32 @@ app.patch("/groups/:id", async (c) => {
   return c.json({ ok: true });
 });
 
+// Add one empty group at the end, named after its position (第 N 組).
+app.post("/groupings/:id/groups", async (c) => {
+  const db = c.env.DB;
+  const grouping = await getGrouping(db, c.req.param("id"));
+  if (!grouping) return fail(c, GROUPING_GONE, 404);
+  const row = await db
+    .prepare("SELECT COUNT(*) AS n, COALESCE(MAX(position), -1) AS last FROM groups WHERE grouping_id = ?")
+    .bind(grouping.id)
+    .first<{ n: number; last: number }>();
+  const n = row?.n ?? 0;
+  if (n >= MAX_GROUPS) return fail(c, `一套分組最多 ${MAX_GROUPS} 組。`);
+  const group = { id: crypto.randomUUID(), name: defaultGroupName(n), studentIds: [] as string[] };
+  await db
+    .prepare("INSERT INTO groups (id, grouping_id, name, position) VALUES (?, ?, ?, ?)")
+    .bind(group.id, grouping.id, group.name, (row?.last ?? -1) + 1)
+    .run();
+  return c.json(group, 201);
+});
+
+// Members of a deleted group go back to 未分組 (their rows cascade away).
+app.delete("/groups/:id", async (c) => {
+  const res = await c.env.DB.prepare("DELETE FROM groups WHERE id = ?").bind(c.req.param("id")).run();
+  if (!res.meta.changes) return fail(c, "找不到這一組，可能已經被刪除。", 404);
+  return c.json({ ok: true });
+});
+
 // Body: { groupId: string | null }. null takes the student out of this grouping.
 app.put("/groupings/:id/members/:studentId", async (c) => {
   const { groupId } = await readBody(c);
@@ -180,6 +206,7 @@ app.post("/groupings/:id/shuffle", async (c) => {
     .bind(grouping.id)
     .all<{ id: string }>();
   const groupIds = groups.map((g) => g.id);
+  if (groupIds.length === 0) return fail(c, "這套分組還沒有任何組，請先按「新增一組」。");
   const studentIds = await classStudentIds(db, grouping.class_id);
   await db.batch([
     db.prepare("DELETE FROM group_members WHERE grouping_id = ?").bind(grouping.id),
