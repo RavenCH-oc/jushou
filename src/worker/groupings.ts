@@ -139,16 +139,20 @@ app.post("/groupings/:id/groups", async (c) => {
   const db = c.env.DB;
   const grouping = await getGrouping(db, c.req.param("id"));
   if (!grouping) return fail(c, GROUPING_GONE, 404);
-  const row = await db
-    .prepare("SELECT COUNT(*) AS n, COALESCE(MAX(position), -1) AS last FROM groups WHERE grouping_id = ?")
+  const { results } = await db
+    .prepare("SELECT name, position FROM groups WHERE grouping_id = ?")
     .bind(grouping.id)
-    .first<{ n: number; last: number }>();
-  const n = row?.n ?? 0;
-  if (n >= MAX_GROUPS) return fail(c, `一套分組最多 ${MAX_GROUPS} 組。`);
-  const group = { id: crypto.randomUUID(), name: defaultGroupName(n), studentIds: [] as string[] };
+    .all<{ name: string; position: number }>();
+  if (results.length >= MAX_GROUPS) return fail(c, `一套分組最多 ${MAX_GROUPS} 組。`);
+  // First 第 N 組 not already used (a group may have been deleted).
+  const used = new Set(results.map((g) => g.name));
+  let i = results.length;
+  while (used.has(defaultGroupName(i))) i++;
+  const group = { id: crypto.randomUUID(), name: defaultGroupName(i), studentIds: [] as string[] };
+  const last = Math.max(-1, ...results.map((g) => g.position));
   await db
     .prepare("INSERT INTO groups (id, grouping_id, name, position) VALUES (?, ?, ?, ?)")
-    .bind(group.id, grouping.id, group.name, (row?.last ?? -1) + 1)
+    .bind(group.id, grouping.id, group.name, last + 1)
     .run();
   return c.json(group, 201);
 });

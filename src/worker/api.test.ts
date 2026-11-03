@@ -306,6 +306,8 @@ describe("groupings", () => {
     expect(g.groups.map((x) => x.name)).toEqual(["第 2 組", "第 3 組"]);
     expect(g.groups.flatMap((x) => x.studentIds)).toHaveLength(2);
     expect(g.students).toHaveLength(4);
+    // Adding again after a delete doesn't reuse a name that's still there.
+    expect((await api<{ name: string }>("POST", `/groupings/${data.id}/groups`)).data.name).toBe("第 4 組");
     expect((await api("DELETE", `/groups/${g.groups[0].id}`)).status).toBe(200);
     expect((await api("DELETE", `/groups/${g.groups[0].id}`)).status).toBe(404);
   });

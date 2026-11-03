@@ -135,3 +135,11 @@ export function Rename(props: {
     </Modal>
   );
 }
+
+// "11/3 14:05", with the year in front when it isn't this year.
+export function formatTime(iso: string) {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const day = `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return d.getFullYear() === new Date().getFullYear() ? day : `${d.getFullYear()}/${day}`;
+}

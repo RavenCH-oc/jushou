@@ -1,0 +1,53 @@
+/* Student question view: phone portrait first, whole rows tappable, 48px+ targets. */
+.qv { display: grid; gap: var(--space-2); }
+.qv p { margin: 0; }
+.qv-meta { color: var(--text-muted); font-size: var(--fs-small); }
+.qv-text { font-size: 22px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.qv-note { color: var(--text-muted); white-space: pre-wrap; border-left: 4px solid var(--border); padding-left: var(--space-2); }
+.qv-hint { font-weight: 700; }
+.qv-empty { color: var(--text-muted); }
+.qv-blank {
+  display: inline-block;
+  min-width: 3.5em;
+  margin: 0 0.15em;
+  border-bottom: 2px solid var(--text);
+  text-align: center;
+  font-weight: 700;
+}
+
+.qv-options, .qv-blanks { display: grid; gap: var(--space-1); }
+.qv-tf { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+.qv-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--space-1) var(--space-2);
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.qv-tf .qv-option { justify-content: center; min-height: 72px; font-size: 24px; font-weight: 700; }
+.qv-option.qv-on { border-color: var(--primary); background: #eef2fb; box-shadow: inset 0 0 0 2px var(--primary); }
+.qv-letter {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  font-weight: 700;
+}
+.qv-on .qv-letter { border-color: var(--primary); background: var(--primary); color: var(--primary-text); }
+.qv-mark { font-size: 30px; line-height: 1; }
+
+.qv-blank-field { display: grid; gap: 4px; margin: 0; }
+.qv-essay { min-height: 180px; padding: var(--space-2); line-height: 1.6; resize: vertical; }
