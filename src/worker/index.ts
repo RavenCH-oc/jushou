@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import type { AppEnv } from "./env";
 import { endSession, passwordMatches, requireTeacher, startSession } from "./auth";
+import classes from "./classes";
+import groupings from "./groupings";
 
 const app = new Hono<AppEnv>();
 
@@ -27,6 +29,8 @@ app.post("/api/teacher/logout", (c) => {
 app.use("/api/teacher/*", requireTeacher);
 
 app.get("/api/teacher/me", (c) => c.json({ ok: true }));
+app.route("/api/teacher", classes);
+app.route("/api/teacher", groupings);
 
 app.notFound((c) => c.json({ error: "找不到這個功能。" }, 404));
 

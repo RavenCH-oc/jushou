@@ -1,8 +1,14 @@
 import { render } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import "../shared/base.css";
+import "./teacher.css";
+import { LOGGED_OUT_EVENT } from "./api";
+import { match, useHashPath } from "./router";
+import { Home, NewClass } from "./home";
+import { ClassPage } from "./class-page";
+import { GroupingPage, NewGrouping, Projection } from "./grouping";
 
-type View = "loading" | "login" | "home" | "offline";
+type View = "loading" | "login" | "app" | "offline";
 
 function App() {
   const [view, setView] = useState<View>("loading");
@@ -10,7 +16,7 @@ function App() {
   const check = async () => {
     try {
       const res = await fetch("/api/teacher/me");
-      setView(res.ok ? "home" : "login");
+      setView(res.ok ? "app" : "login");
     } catch {
       setView("offline");
     }
@@ -18,6 +24,9 @@ function App() {
 
   useEffect(() => {
     check();
+    const onLoggedOut = () => setView("login");
+    window.addEventListener(LOGGED_OUT_EVENT, onLoggedOut);
+    return () => window.removeEventListener(LOGGED_OUT_EVENT, onLoggedOut);
   }, []);
 
   if (view === "loading") return <main class="page">載入中…</main>;
@@ -25,12 +34,25 @@ function App() {
     return (
       <main class="page narrow stack">
         <p class="error">連不上伺服器，請確認網路後再試一次。</p>
-        <button class="btn" onClick={check}>重新連線</button>
+        <button class="btn" onClick={check}>
+          重新連線
+        </button>
       </main>
     );
   }
-  if (view === "login") return <Login onDone={() => setView("home")} />;
-  return <Home onLogout={() => setView("login")} />;
+  if (view === "login") return <Login onDone={() => setView("app")} />;
+  return <Routes onLogout={() => setView("login")} />;
+}
+
+function Routes({ onLogout }: { onLogout: () => void }) {
+  const path = useHashPath();
+  let m;
+  if ((m = match("/new", path))) return <NewClass />;
+  if ((m = match("/class/:id/new-grouping", path))) return <NewGrouping classId={m.id} />;
+  if ((m = match("/class/:id/:tab?", path))) return <ClassPage id={m.id} tab={m.tab} />;
+  if ((m = match("/grouping/:id/show", path))) return <Projection id={m.id} />;
+  if ((m = match("/grouping/:id", path))) return <GroupingPage id={m.id} />;
+  return <Home onLogout={onLogout} />;
 }
 
 function Login({ onDone }: { onDone: () => void }) {
@@ -72,31 +94,15 @@ function Login({ onDone }: { onDone: () => void }) {
             onInput={(e) => setPassword(e.currentTarget.value)}
           />
         </div>
-        {error && <p class="error" role="alert">{error}</p>}
+        {error && (
+          <p class="error" role="alert">
+            {error}
+          </p>
+        )}
         <button class="btn btn-block" type="submit" disabled={busy || !password}>
           {busy ? "登入中…" : "登入"}
         </button>
       </form>
-    </main>
-  );
-}
-
-function Home({ onLogout }: { onLogout: () => void }) {
-  const logout = async () => {
-    await fetch("/api/teacher/logout", { method: "POST" }).catch(() => {});
-    onLogout();
-  };
-
-  return (
-    <main class="page">
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px" }}>
-        <h1 style={{ margin: 0 }}>舉手</h1>
-        <button class="btn btn-secondary" onClick={logout}>登出</button>
-      </header>
-      <section class="card" style={{ marginTop: "var(--space-4)" }}>
-        <h2>班級</h2>
-        <p class="muted">還沒有班級</p>
-      </section>
     </main>
   );
 }

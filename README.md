@@ -17,7 +17,7 @@ pnpm install
 pnpm dev
 ```
 
-打開 http://localhost:5173/t/ ，密碼 `dev`。本機資料庫在 `.wrangler/`，不會碰到正式資料。
+打開 http://localhost:5173/t/ ，密碼 `dev`。本機資料庫在 `.wrangler/`，不會碰到正式資料；`pnpm dev` 會先自動套用新的 migration（有新的時會問一次，輸入 `y`）。
 
 第一次在新電腦上開發，要先建立 `.dev.vars`（已被 git 忽略）：
 
@@ -26,6 +26,8 @@ node -e "process.stdout.write('TEACHER_PASSWORD=dev\nSESSION_SECRET=' + require(
 ```
 
 其他指令：`pnpm test`、`pnpm typecheck`、`pnpm build`。
+
+測試用 Node 內建的 `node:sqlite` 模擬 D1（`src/worker/test/d1.ts`），需要 Node 22.5 以上。
 
 ## 部署
 

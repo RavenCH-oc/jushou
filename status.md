@@ -2,14 +2,18 @@
 
 ## 完成
 - Phase 0：專案骨架、老師密碼登入、部署流程
-- 正式網址：https://jushou.ryanaddy1102.workers.dev（老師端 `/t/`）
-- D1 `jushou-db` 已建立，`0001_init` 已套用；`SESSION_SECRET`、`TEACHER_PASSWORD` 已設定，正式環境可登入
+- Phase 1（PR 待審）：班級、學生名冊（貼上匯入）、分組（隨機／手動、換組、複製、投影）
+- 正式網址：https://jushou.ryanaddy1102.workers.dev（老師端 `/t/`）。Phase 1 尚未部署
 
 ## 下一步
-- Phase 1：班級、學生名冊、分組（`docs/tasks/phase-1.md`）
+- 使用者 merge Phase 1 後部署（`pnpm run deploy` 會套用 `0002_classes` migration）
+- Phase 2：題組與題目編輯
 
 ## 使用者待辦
+- 審 Phase 1 PR，照 PR 裡的「操作流程」實際點一遍
 - 在學校 Wi-Fi／學校電腦打開正式網址，確認沒被擋
 
 ## 已知問題
 - 學生端輸入加入碼後只顯示「功能製作中」（Phase 3 才接上）
+- 分組建立後才加入的學生，會出現在該分組的「未分組」區，要手動放進組裡
+- 投影顯示在組數很多（8 組以上）時，投影機解析度低可能需要捲動
