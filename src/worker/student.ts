@@ -4,7 +4,7 @@
 import { Hono, type Context } from "hono";
 import type { AppEnv } from "./env";
 import { gradeAnswer, toStudentView, type GradeResult } from "../shared/grading";
-import type { StudentCurrent, StudentState } from "../shared/lesson";
+import type { LessonResult, StudentCurrent, StudentState } from "../shared/lesson";
 import { notify } from "./lesson-hub";
 import { toQuestion, type LessonQuestionRow } from "./lessons";
 import { fail, now, readBody } from "./util";
@@ -74,6 +74,45 @@ async function current(db: D1Database, lessonId: string, questionId: string, me:
   return out;
 }
 
+// Midnight in Taiwan (UTC+8, no daylight saving), as the ISO string lessons store.
+export function startOfTaipeiDay(at = new Date()) {
+  const offset = 8 * 3600_000;
+  const day = Math.floor((at.getTime() + offset) / 86_400_000) * 86_400_000;
+  return new Date(day - offset).toISOString();
+}
+
+// This student's results in the last lesson they joined that ended today, if any.
+async function todaysResult(db: D1Database, classId: string, me: Me): Promise<LessonResult | null> {
+  const lesson = await db
+    .prepare(
+      `SELECT l.id, l.set_name FROM lessons l JOIN lesson_students ls ON ls.lesson_id = l.id AND ls.student_id = ?
+       WHERE l.class_id = ? AND l.status = 'ended' AND l.ended_at >= ? ORDER BY l.ended_at DESC LIMIT 1`,
+    )
+    .bind(me.id, classId, startOfTaipeiDay())
+    .first<{ id: string; set_name: string }>();
+  if (!lesson) return null;
+  const { results } = await db
+    .prepare(
+      `SELECT q.text, q.type, q.points, q.status, a.status AS result, a.score
+       FROM lesson_questions q LEFT JOIN answers a ON a.lesson_question_id = q.id AND a.student_id = ?
+       WHERE q.lesson_id = ? ORDER BY q.position`,
+    )
+    .bind(me.id, lesson.id)
+    .all<{ text: string; type: string; points: number; status: string; result: GradeResult["status"] | null; score: number | null }>();
+  const out: LessonResult = { setName: lesson.set_name, items: [], score: 0, max: 0 };
+  results.forEach((r, i) => {
+    const revealed = r.status === "revealed";
+    const result = revealed ? (r.result ?? "unanswered") : "hidden";
+    const score = revealed ? (r.result ? r.score : 0) : null;
+    out.items.push({ number: i + 1, snippet: r.text.replace(/\s+/g, " ").slice(0, 20), result, score });
+    if (revealed && r.type !== "essay") {
+      out.max += r.points;
+      out.score += score ?? 0;
+    }
+  });
+  return out;
+}
+
 app.get("/state/:code", async (c) => {
   const db = c.env.DB;
   const cls = await findClass(db, c.req.param("code"));
@@ -95,6 +134,8 @@ app.get("/state/:code", async (c) => {
       .run();
     if (joined.meta.changes) await notify(c.env, lesson.id, "roster", "teacher");
     if (lesson.current_question_id) state.current = await current(db, lesson.id, lesson.current_question_id, me);
+  } else {
+    state.result = await todaysResult(db, cls.id, me);
   }
   return c.json(state);
 });

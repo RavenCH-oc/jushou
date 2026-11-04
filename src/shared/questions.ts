@@ -114,7 +114,10 @@ export function validateQuestion(raw: unknown): { value: QuestionData } | { erro
     if (options.length < MIN_OPTIONS) errors.options = `至少要有 ${MIN_OPTIONS} 個選項。`;
     else if (options.length > MAX_OPTIONS) errors.options = `最多 ${MAX_OPTIONS} 個選項。`;
     options.forEach((o, i) => {
-      if (!o) errors[`option-${i}`] = `選項 ${optionLetter(i)} 還沒有內容。`;
+      if (!o) {
+        errors[`option-${i}`] =
+          `選項 ${optionLetter(i)} 還沒有內容。` + (options.length > MIN_OPTIONS ? "不需要這個選項的話，可以按下面的「刪除」。" : "");
+      }
       else if (o.length > MAX_OPTION_TEXT) errors[`option-${i}`] = `每個選項最多 ${MAX_OPTION_TEXT} 個字。`;
     });
     const valid = correct.filter((i): i is number => Number.isInteger(i) && i >= 0 && i < options.length);

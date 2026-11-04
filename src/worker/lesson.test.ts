@@ -330,3 +330,74 @@ describe("student", () => {
     expect((await a.state()).data).toMatchObject({ lessonId: next.id, me: { seat: 2 } });
   });
 });
+
+describe("phase 3.5", () => {
+  it("can't change the join code during a lesson", async () => {
+    const { id, cls } = await startLesson();
+    expect((await teacher<{ inLesson: boolean }>("GET", `/classes/${cls.id}`)).data.inLesson).toBe(true);
+    expect((await teacher("POST", `/classes/${cls.id}/join-code`)).status).toBe(409);
+    await teacher("POST", `/lessons/${id}/end`);
+    expect((await teacher<{ inLesson: boolean }>("GET", `/classes/${cls.id}`)).data.inLesson).toBe(false);
+    expect((await teacher("POST", `/classes/${cls.id}/join-code`)).status).toBe(200);
+  });
+
+  it("after class, shows only my own results and no answers of unrevealed questions", async () => {
+    const { id, qs, step, lesson } = await startLesson();
+    const code = (await lesson()).joinCode;
+    const me = phone(code);
+    const other = phone(code);
+    await me.bind(1);
+    await other.bind(2);
+    await me.state();
+    await other.state();
+
+    await step(qs[0].id, "open");
+    await me.answer(qs[0].id, true);
+    await other.answer(qs[0].id, false);
+    await step(qs[0].id, "close");
+    await step(qs[0].id, "reveal");
+    await step(qs[1].id, "open");
+    await me.answer(qs[1].id, 1);
+    await other.answer(qs[1].id, 0);
+    await step(qs[1].id, "close");
+    await step(qs[1].id, "reveal");
+    await step(qs[2].id, "open");
+    await me.answer(qs[2].id, [0, 2]); // right, but never revealed
+    expect((await me.state()).data.result).toBeUndefined(); // only once the lesson is over
+
+    await teacher("POST", `/lessons/${id}/end`);
+    const { data } = await me.state();
+    expect(data.lessonId).toBeNull();
+    expect(data.result).toEqual({
+      setName: "出師表",
+      score: 1,
+      max: 3,
+      items: [
+        { number: 1, snippet: "〈出師表〉作者是諸葛亮", result: "correct", score: 1 },
+        { number: 2, snippet: "「臣本布衣」的布衣指", result: "wrong", score: 0 },
+        { number: 3, snippet: "哪些是三國人物", result: "hidden", score: null },
+        { number: 4, snippet: "學而時習之，不亦＿＿＿乎？有朋自遠方來，", result: "hidden", score: null },
+        { number: 5, snippet: "寫下你的感想", result: "hidden", score: null },
+      ],
+    });
+    expect(JSON.stringify(data)).not.toMatch(/correct"?:\s*\[|options|blanks|"answer"/);
+    expect((await other.state()).data.result?.items.slice(0, 2).map((i) => i.result)).toEqual(["wrong", "correct"]);
+    // A phone that never joined that lesson sees nothing.
+    const late = phone(code);
+    await late.bind(3);
+    expect((await late.state()).data.result).toBeNull();
+  });
+
+  it("only today's lessons, by Taiwan time", async () => {
+    const { startOfTaipeiDay } = await import("./student");
+    expect(startOfTaipeiDay(new Date("2026-11-04T15:59:00Z"))).toBe("2026-11-03T16:00:00.000Z"); // 23:59 in Taipei
+    expect(startOfTaipeiDay(new Date("2026-11-04T16:00:00Z"))).toBe("2026-11-04T16:00:00.000Z"); // midnight
+    const { id, lesson } = await startLesson();
+    const me = phone((await lesson()).joinCode);
+    await me.bind(1);
+    await me.state();
+    await teacher("POST", `/lessons/${id}/end`);
+    await env.DB.prepare("UPDATE lessons SET ended_at = ?").bind(new Date(Date.now() - 86_400_000 * 2).toISOString()).run();
+    expect((await me.state()).data.result).toBeNull();
+  });
+});

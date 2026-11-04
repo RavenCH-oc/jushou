@@ -40,12 +40,7 @@ export function SetPage({ id }: { id: string }) {
       <a class="back" href={href("/")}>
         ← 回首頁
       </a>
-      <header class="topbar">
-        <h1>{set.name}</h1>
-        <button class="btn" onClick={() => setDialog({ kind: "add" })}>
-          新增題目
-        </button>
-      </header>
+      <h1>{set.name}</h1>
       <div class="section-head">
         <p class="muted set-total">
           共 {set.questions.length} 題，總分 {total} 分
@@ -59,7 +54,7 @@ export function SetPage({ id }: { id: string }) {
       <ErrorText message={action.error} />
 
       {set.questions.length === 0 ? (
-        <p class="muted">還沒有題目。按「新增題目」開始。</p>
+        <p class="muted">這個題組還沒有題目</p>
       ) : (
         <ol class="question-list">
           {set.questions.map((q, i) => (
@@ -100,6 +95,10 @@ export function SetPage({ id }: { id: string }) {
           ))}
         </ol>
       )}
+      {/* Right under the last question, where the new one will appear. */}
+      <button class="btn btn-block add-question" onClick={() => setDialog({ kind: "add" })}>
+        ＋ 新增第 {set.questions.length + 1} 題
+      </button>
 
       <div class="row tools">
         <button class="btn btn-secondary" onClick={() => setDialog({ kind: "rename" })}>

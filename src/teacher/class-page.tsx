@@ -124,9 +124,12 @@ function Settings({ cls, reload }: { cls: ClassDetail; reload: () => void }) {
         <h2>加入碼</h2>
         <p class="join-code-big">{cls.joinCode}</p>
         <p class="muted">學生上課時輸入這組數字加入。如果加入碼外流，可以換一組新的。</p>
-        <button class="btn btn-secondary" onClick={() => setConfirmCode(true)}>
-          重新產生加入碼
-        </button>
+        <div class="row row-center">
+          <button class="btn btn-secondary" disabled={cls.inLesson} onClick={() => setConfirmCode(true)}>
+            重新產生加入碼
+          </button>
+          {cls.inLesson && <span class="muted">上課中不能更換，下課後再換</span>}
+        </div>
       </section>
 
       <section class="card card-danger">

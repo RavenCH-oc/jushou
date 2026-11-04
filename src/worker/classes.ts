@@ -45,7 +45,7 @@ app.get("/classes/:id", async (c) => {
   const db = c.env.DB;
   const cls = await getClass(db, c.req.param("id"));
   if (!cls) return fail(c, CLASS_GONE, 404);
-  const [students, groupings] = await Promise.all([
+  const [students, groupings, lesson] = await Promise.all([
     db.prepare("SELECT id, seat, name FROM students WHERE class_id = ? ORDER BY seat").bind(cls.id).all<Student>(),
     db
       .prepare(
@@ -54,6 +54,7 @@ app.get("/classes/:id", async (c) => {
       )
       .bind(cls.id)
       .all<GroupingSummary>(),
+    activeLessonOf(db, cls.id),
   ]);
   const detail: ClassDetail = {
     id: cls.id,
@@ -61,9 +62,14 @@ app.get("/classes/:id", async (c) => {
     joinCode: cls.join_code,
     students: students.results,
     groupings: groupings.results,
+    inLesson: !!lesson,
   };
   return c.json(detail);
 });
+
+function activeLessonOf(db: D1Database, classId: string) {
+  return db.prepare("SELECT id FROM lessons WHERE class_id = ? AND status = 'active'").bind(classId).first<{ id: string }>();
+}
 
 app.patch("/classes/:id", async (c) => {
   const { name } = await readBody(c);
@@ -77,6 +83,8 @@ app.patch("/classes/:id", async (c) => {
 });
 
 app.post("/classes/:id/join-code", async (c) => {
+  // A new code would send every student in the lesson back to the join screen.
+  if (await activeLessonOf(c.env.DB, c.req.param("id"))) return fail(c, "正在上課，不能更換加入碼。下課後再換。", 409);
   const joinCode = await uniqueJoinCode(c.env.DB);
   const res = await c.env.DB.prepare("UPDATE classes SET join_code = ? WHERE id = ?")
     .bind(joinCode, c.req.param("id"))
@@ -88,7 +96,7 @@ app.post("/classes/:id/join-code", async (c) => {
 // Students, groupings, lessons and answers go with it via ON DELETE CASCADE.
 app.delete("/classes/:id", async (c) => {
   const db = c.env.DB;
-  const lesson = await db.prepare("SELECT id FROM lessons WHERE class_id = ? AND status = 'active'").bind(c.req.param("id")).first<{ id: string }>();
+  const lesson = await activeLessonOf(db, c.req.param("id"));
   const res = await db.prepare("DELETE FROM classes WHERE id = ?").bind(c.req.param("id")).run();
   if (!res.meta.changes) return fail(c, CLASS_GONE, 404);
   if (lesson) await notify(c.env, lesson.id, "ended");
