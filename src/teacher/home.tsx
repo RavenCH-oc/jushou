@@ -1,19 +1,24 @@
 import { useState } from "preact/hooks";
 import { api } from "./api";
 import { go, href } from "./router";
-import { ErrorText, Loading, useAction, useLoad } from "./ui";
+import { ErrorText, formatTime, Loading, useAction, useLoad } from "./ui";
 import { MAX_CLASS_NAME } from "../shared/limits";
-import type { ClassSummary } from "../shared/types";
+import { MAX_SET_NAME } from "../shared/questions";
+import type { ClassSummary, QuestionSetSummary } from "../shared/types";
 
 export function Home({ onLogout }: { onLogout: () => void }) {
-  const { data: classes, error } = useLoad(() => api<ClassSummary[]>("GET", "/classes"), []);
+  const { data, error } = useLoad(
+    () => Promise.all([api<ClassSummary[]>("GET", "/classes"), api<QuestionSetSummary[]>("GET", "/sets")]),
+    [],
+  );
 
   const logout = async () => {
     await fetch("/api/teacher/logout", { method: "POST" }).catch(() => {});
     onLogout();
   };
 
-  if (!classes) return <Loading error={error} />;
+  if (!data) return <Loading error={error} />;
+  const [classes, sets] = data;
   return (
     <main class="page">
       <header class="topbar">
@@ -44,6 +49,74 @@ export function Home({ onLogout }: { onLogout: () => void }) {
           </ul>
         )}
       </section>
+      <section class="home-section">
+        <div class="section-head">
+          <h2>題組</h2>
+          <a class="btn" href={href("/new-set")}>
+            新增題組
+          </a>
+        </div>
+        {sets.length === 0 ? (
+          <p class="muted">還沒有題組。按「新增題組」開始出題。</p>
+        ) : (
+          <ul class="card-list">
+            {sets.map((s) => (
+              <li key={s.id}>
+                <a class="card card-link" href={href(`/set/${s.id}`)}>
+                  <strong>{s.name}</strong>
+                  <span class="muted">
+                    {s.questionCount} 題・{formatTime(s.updatedAt)} 修改
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </main>
+  );
+}
+
+export function NewSet() {
+  const [name, setName] = useState("");
+  const { busy, error, run } = useAction();
+
+  const submit = (e: Event) => {
+    e.preventDefault();
+    run(async () => {
+      const set = await api<QuestionSetSummary>("POST", "/sets", { name });
+      location.replace(href(`/set/${set.id}`));
+    });
+  };
+
+  return (
+    <main class="page narrow">
+      <a class="back" href={href("/")}>
+        ← 回首頁
+      </a>
+      <h1>新增題組</h1>
+      <form class="stack" onSubmit={submit}>
+        <div>
+          <label for="name">題組名稱</label>
+          <input
+            id="name"
+            class="field"
+            placeholder="例如：〈出師表〉課後練習"
+            maxLength={MAX_SET_NAME}
+            autoFocus
+            value={name}
+            onInput={(e) => setName(e.currentTarget.value)}
+          />
+        </div>
+        <p class="muted">題組不屬於任何班級，之後每個班上課都可以用。</p>
+        <ErrorText message={error} />
+        <button class="btn btn-block" type="submit" disabled={busy || !name.trim()}>
+          建立題組
+        </button>
+        <button class="btn btn-secondary btn-block" type="button" onClick={() => go("/")}>
+          取消
+        </button>
+      </form>
     </main>
   );
 }

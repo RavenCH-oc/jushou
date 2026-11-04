@@ -108,7 +108,8 @@ function Choice(props: { checked: boolean; onSelect: () => void; title: string; 
 
 type Dialog =
   | { kind: "student"; student: Student; groupId: string | null }
-  | { kind: "rename-group"; id: string; name: string }
+  | { kind: "group"; id: string; name: string; size: number }
+  | { kind: "delete-group"; id: string; name: string; size: number }
   | { kind: "rename" }
   | { kind: "shuffle" }
   | { kind: "delete" };
@@ -131,6 +132,12 @@ export function GroupingPage({ id }: { id: string }) {
       reload();
     });
 
+  const addGroup = () =>
+    action.run(async () => {
+      await api("POST", `/groupings/${g.id}/groups`);
+      reload();
+    });
+
   const copy = () =>
     action.run(async () => {
       const c = await api<GroupingSummary>("POST", `/groupings/${g.id}/copy`);
@@ -148,13 +155,13 @@ export function GroupingPage({ id }: { id: string }) {
           投影顯示
         </a>
       </header>
-      <p class="muted">點學生可以換組，點組名可以改名。</p>
+      <p class="muted">點學生可以換組，點組名可以改名或刪除這一組。</p>
       <ErrorText message={action.error} />
 
       <div class="group-grid">
         {g.groups.map((group) => (
           <section key={group.id} class="card group">
-            <button class="group-name" onClick={() => setDialog({ kind: "rename-group", id: group.id, name: group.name })}>
+            <button class="group-name" onClick={() => setDialog({ kind: "group", id: group.id, name: group.name, size: group.studentIds.length })}>
               {group.name}
               <span class="muted">{group.studentIds.length} 人</span>
             </button>
@@ -171,8 +178,12 @@ export function GroupingPage({ id }: { id: string }) {
         ))}
       </div>
 
+      <button class="btn btn-secondary" disabled={action.busy} onClick={addGroup}>
+        ＋ 新增一組
+      </button>
+
       {unplaced.length > 0 && (
-        <section class="card unplaced">
+        <section class="card unplaced tools">
           <h2>未分組（{unplaced.length} 人）</h2>
           <div class="member-wrap">
             {unplaced.map((s) => (
@@ -188,7 +199,7 @@ export function GroupingPage({ id }: { id: string }) {
         <button class="btn btn-secondary" onClick={() => setDialog({ kind: "rename" })}>
           改分組名稱
         </button>
-        <button class="btn btn-secondary" onClick={() => setDialog({ kind: "shuffle" })}>
+        <button class="btn btn-secondary" disabled={g.groups.length === 0} onClick={() => setDialog({ kind: "shuffle" })}>
           重新隨機
         </button>
         <button class="btn btn-secondary" disabled={action.busy} onClick={copy}>
@@ -220,7 +231,7 @@ export function GroupingPage({ id }: { id: string }) {
           </div>
         </Modal>
       )}
-      {dialog?.kind === "rename-group" && (
+      {dialog?.kind === "group" && (
         <Rename
           title="修改組名"
           label="組名"
@@ -228,6 +239,27 @@ export function GroupingPage({ id }: { id: string }) {
           maxLength={MAX_GROUP_NAME}
           onSave={async (name) => {
             await api("PATCH", `/groups/${dialog.id}`, { name });
+            reload();
+          }}
+          onClose={close}
+        >
+          <button class="btn btn-secondary btn-block" type="button" onClick={() => setDialog({ ...dialog, kind: "delete-group" })}>
+            刪除這一組
+          </button>
+        </Rename>
+      )}
+      {dialog?.kind === "delete-group" && (
+        <Confirm
+          title={`刪除「${dialog.name}」？`}
+          message={
+            dialog.size > 0
+              ? `這一組的 ${dialog.size} 位組員會回到「未分組」，學生不會被刪除。`
+              : "這一組會被刪除。"
+          }
+          confirmLabel="刪除這一組"
+          danger
+          onConfirm={async () => {
+            await api("DELETE", `/groups/${dialog.id}`);
             reload();
           }}
           onClose={close}

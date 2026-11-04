@@ -7,11 +7,40 @@ function currentPath() {
   return location.hash.replace(/^#/, "") || "/";
 }
 
+let shownPath = currentPath();
+let previousPath: string | null = null;
+let leaveGuard: (() => boolean) | null = null;
+
+// While `guard` is set, leaving the page (in-app link, 上一頁, F5, closing the tab)
+// asks first; `guard` returns true when it's fine to leave.
+export function useLeaveGuard(guard: () => boolean, message: string) {
+  useEffect(() => {
+    leaveGuard = () => guard() || confirm(message);
+    const onUnload = (e: BeforeUnloadEvent) => {
+      if (!guard()) e.preventDefault(); // the browser shows its own wording here
+    };
+    window.addEventListener("beforeunload", onUnload);
+    return () => {
+      leaveGuard = null;
+      window.removeEventListener("beforeunload", onUnload);
+    };
+  }, []);
+}
+
 export function useHashPath() {
   const [path, setPath] = useState(currentPath);
   useEffect(() => {
     const onChange = () => {
-      setPath(currentPath());
+      const next = currentPath();
+      if (next === shownPath) return;
+      if (leaveGuard && !leaveGuard()) {
+        // Stay: put the page we were on back into the address bar.
+        history.pushState(null, "", `#${shownPath}`);
+        return;
+      }
+      previousPath = shownPath;
+      shownPath = next;
+      setPath(next);
       window.scrollTo(0, 0);
     };
     window.addEventListener("hashchange", onChange);
@@ -22,6 +51,13 @@ export function useHashPath() {
 
 export function go(path: string) {
   location.hash = path;
+}
+
+// Go back to `path`: a real "上一頁" if that's where we came from (keeps history
+// tidy), otherwise replace this page with it (e.g. opened after F5).
+export function goBackTo(path: string) {
+  if (previousPath === path) history.back();
+  else location.replace(href(path));
 }
 
 export function href(path: string) {

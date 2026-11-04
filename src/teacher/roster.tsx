@@ -234,7 +234,7 @@ function AddStudent({ cls, reload }: { cls: ClassDetail; reload: () => void }) {
   const [seat, setSeat] = useState("");
   const [name, setName] = useState("");
   const { busy, error, run } = useAction();
-  const seatValue = seat || String(nextSeat);
+  const seatValue = seat.trim() || String(nextSeat);
 
   return (
     <form
@@ -255,7 +255,7 @@ function AddStudent({ cls, reload }: { cls: ClassDetail; reload: () => void }) {
       <div class="row">
         <div>
           <label for="new-seat">座號</label>
-          <input id="new-seat" class="field field-seat" inputMode="numeric" value={seatValue} onInput={(e) => setSeat(e.currentTarget.value)} />
+          <input id="new-seat" class="field field-seat" inputMode="numeric" placeholder={String(nextSeat)} value={seat} onInput={(e) => setSeat(e.currentTarget.value)} />
         </div>
         <div class="grow">
           <label for="new-name">姓名</label>

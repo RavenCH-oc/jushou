@@ -4,9 +4,11 @@ import "../shared/base.css";
 import "./teacher.css";
 import { LOGGED_OUT_EVENT } from "./api";
 import { match, useHashPath } from "./router";
-import { Home, NewClass } from "./home";
+import { Home, NewClass, NewSet } from "./home";
 import { ClassPage } from "./class-page";
 import { GroupingPage, NewGrouping, Projection } from "./grouping";
+import { SetPage, SetPreview } from "./question-set";
+import { QuestionEditor } from "./question-editor";
 
 type View = "loading" | "login" | "app" | "offline";
 
@@ -52,6 +54,11 @@ function Routes({ onLogout }: { onLogout: () => void }) {
   if ((m = match("/class/:id/:tab?", path))) return <ClassPage id={m.id} tab={m.tab} />;
   if ((m = match("/grouping/:id/show", path))) return <Projection id={m.id} />;
   if ((m = match("/grouping/:id", path))) return <GroupingPage id={m.id} />;
+  if ((m = match("/new-set", path))) return <NewSet />;
+  if ((m = match("/set/:id/preview", path))) return <SetPreview id={m.id} />;
+  if ((m = match("/set/:id/add/:type", path))) return <QuestionEditor key={path} setId={m.id} type={m.type} />;
+  if ((m = match("/set/:id/q/:qid", path))) return <QuestionEditor key={path} setId={m.id} questionId={m.qid} />;
+  if ((m = match("/set/:id", path))) return <SetPage id={m.id} />;
   return <Home onLogout={onLogout} />;
 }
 

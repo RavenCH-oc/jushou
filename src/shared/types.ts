@@ -1,4 +1,5 @@
 // Shapes returned by the teacher API.
+import type { Question } from "./questions";
 
 export type ClassSummary = { id: string; name: string; joinCode: string; studentCount: number };
 
@@ -26,3 +27,7 @@ export type GroupingDetail = {
 };
 
 export type ImportResult = { added: number; updated: number; skipped: number };
+
+export type QuestionSetSummary = { id: string; name: string; questionCount: number; updatedAt: string };
+
+export type QuestionSetDetail = { id: string; name: string; updatedAt: string; questions: Question[] };

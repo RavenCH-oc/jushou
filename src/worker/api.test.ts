@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import app from "./index";
 import type { Bindings } from "./env";
 import { createTestDb } from "./test/d1";
-import type { ClassDetail, ClassSummary, GroupingDetail, GroupingSummary, ImportResult } from "../shared/types";
+import type { ClassDetail, ClassSummary, GroupingDetail, GroupingSummary, ImportResult, QuestionSetDetail, QuestionSetSummary } from "../shared/types";
+import type { Question } from "../shared/questions";
 
 let env: Bindings;
 let cookie: string;
@@ -61,6 +62,19 @@ describe("auth", () => {
       ["PUT", "/groupings/x/members/y"],
       ["POST", "/groupings/x/shuffle"],
       ["POST", "/groupings/x/copy"],
+      ["POST", "/groupings/x/groups"],
+      ["DELETE", "/groups/x"],
+      ["GET", "/sets"],
+      ["POST", "/sets"],
+      ["GET", "/sets/x"],
+      ["PATCH", "/sets/x"],
+      ["DELETE", "/sets/x"],
+      ["POST", "/sets/x/copy"],
+      ["POST", "/sets/x/questions"],
+      ["PATCH", "/questions/x"],
+      ["DELETE", "/questions/x"],
+      ["POST", "/questions/x/copy"],
+      ["POST", "/questions/x/move"],
     ];
     for (const [method, path] of routes) {
       const { status } = await api(method, path, method === "GET" ? undefined : {}, false);
@@ -278,11 +292,137 @@ describe("groupings", () => {
     expect((await api<ClassDetail>("GET", `/classes/${cls.id}`)).data.groupings.map((x) => x.id)).toEqual([c.id]);
   });
 
+  it("adds a group and deletes one; its members go back to 未分組", async () => {
+    const cls = await classWithStudents(4);
+    const { data } = await api<GroupingSummary>("POST", `/classes/${cls.id}/groupings`, { name: "a", mode: "random", groupCount: 2 });
+    const { status, data: added } = await api<{ id: string; name: string }>("POST", `/groupings/${data.id}/groups`);
+    expect(status).toBe(201);
+    expect(added.name).toBe("第 3 組");
+    let g = await detail(data.id);
+    expect(g.groups.map((x) => x.name)).toEqual(["第 1 組", "第 2 組", "第 3 組"]);
+
+    expect((await api("DELETE", `/groups/${g.groups[0].id}`)).status).toBe(200);
+    g = await detail(data.id);
+    expect(g.groups.map((x) => x.name)).toEqual(["第 2 組", "第 3 組"]);
+    expect(g.groups.flatMap((x) => x.studentIds)).toHaveLength(2);
+    expect(g.students).toHaveLength(4);
+    // Adding again after a delete doesn't reuse a name that's still there.
+    expect((await api<{ name: string }>("POST", `/groupings/${data.id}/groups`)).data.name).toBe("第 4 組");
+    expect((await api("DELETE", `/groups/${g.groups[0].id}`)).status).toBe(200);
+    expect((await api("DELETE", `/groups/${g.groups[0].id}`)).status).toBe(404);
+  });
+
+  it("refuses to shuffle a grouping with no groups", async () => {
+    const cls = await classWithStudents(2);
+    const { data } = await api<GroupingSummary>("POST", `/classes/${cls.id}/groupings`, { name: "a", mode: "manual", groupCount: 1 });
+    await api("DELETE", `/groups/${(await detail(data.id)).groups[0].id}`);
+    expect((await api("POST", `/groupings/${data.id}/shuffle`)).status).toBe(400);
+  });
+
   it("deleting a student removes them from groups", async () => {
     const cls = await classWithStudents(4);
     const { data } = await api<GroupingSummary>("POST", `/classes/${cls.id}/groupings`, { name: "a", mode: "random", groupCount: 2 });
     const g = await detail(data.id);
     await api("DELETE", `/students/${g.students[0].id}`);
     expect((await detail(data.id)).groups.flatMap((x) => x.studentIds)).toHaveLength(3);
+  });
+});
+
+describe("question sets", () => {
+  const fill = { type: "fill", text: "不亦＿＿＿乎", note: "", points: 2, config: { blanks: [["說", "悅"]] } };
+  const single = { type: "single", text: "選一個", note: "", points: 1, config: { options: ["甲", "乙"], correct: [1] } };
+
+  async function newSet(name = "第一課") {
+    return (await api<QuestionSetSummary>("POST", "/sets", { name })).data;
+  }
+  async function detail(id: string) {
+    return (await api<QuestionSetDetail>("GET", `/sets/${id}`)).data;
+  }
+
+  it("creates, lists, renames and deletes a set", async () => {
+    expect((await api("POST", "/sets", { name: " " })).status).toBe(400);
+    const set = await newSet();
+    await api("POST", `/sets/${set.id}/questions`, fill);
+    const { data: list } = await api<QuestionSetSummary[]>("GET", "/sets");
+    expect(list.map((s) => [s.name, s.questionCount])).toEqual([["第一課", 1]]);
+    expect((await api("PATCH", `/sets/${set.id}`, { name: "第二課" })).status).toBe(200);
+    expect((await detail(set.id)).name).toBe("第二課");
+    expect((await api("DELETE", `/sets/${set.id}`)).status).toBe(200);
+    expect((await api("GET", `/sets/${set.id}`)).status).toBe(404);
+    expect(await count("questions")).toBe(0);
+  });
+
+  it("adds questions and returns them in order with their answer settings", async () => {
+    const set = await newSet();
+    const { status, data: q } = await api<Question>("POST", `/sets/${set.id}/questions`, fill);
+    expect(status).toBe(201);
+    await api("POST", `/sets/${set.id}/questions`, single);
+    const d = await detail(set.id);
+    expect(d.questions.map((x) => x.type)).toEqual(["fill", "single"]);
+    expect(d.questions[0]).toEqual({ ...fill, id: q.id });
+  });
+
+  it("rejects invalid questions with a message for each field", async () => {
+    const set = await newSet();
+    const post = (body: object) => api<{ error: string; fields: Record<string, string> }>("POST", `/sets/${set.id}/questions`, body);
+    const bad = [
+      { ...single, config: { options: ["甲", "乙"], correct: [] } },
+      { ...single, config: { options: ["甲"], correct: [0] } },
+      { ...single, type: "multiple", config: { options: ["甲", "乙"], correct: [] } },
+      { ...fill, text: "沒有空格" },
+      { ...fill, config: { blanks: [[]] } },
+      { type: "truefalse", text: "對嗎", note: "", points: 1, config: {} },
+      { type: "essay", text: "", note: "", points: 1, config: {} },
+      { ...fill, points: 0 },
+      { ...fill, type: "picture" },
+    ];
+    for (const body of bad) {
+      const { status, data } = await post(body);
+      expect(status, JSON.stringify(body)).toBe(400);
+      expect(data.error).toBeTruthy();
+    }
+    expect((await post({ ...fill, config: { blanks: [[]] } })).data.fields).toEqual({ "blank-0": "第 1 格還沒有填答案。" });
+    expect((await detail(set.id)).questions).toHaveLength(0);
+  });
+
+  it("edits a question but never its type", async () => {
+    const set = await newSet();
+    const { data: q } = await api<Question>("POST", `/sets/${set.id}/questions`, single);
+    const edited = { ...single, text: "改過", config: { options: ["甲", "乙", "丙"], correct: [2] } };
+    expect((await api("PATCH", `/questions/${q.id}`, edited)).status).toBe(200);
+    expect((await detail(set.id)).questions[0]).toEqual({ ...edited, id: q.id });
+    expect((await api("PATCH", `/questions/${q.id}`, { ...edited, type: "multiple" })).status).toBe(400);
+    expect((await api("PATCH", `/questions/${q.id}`, { ...edited, config: { options: [], correct: [] } })).status).toBe(400);
+  });
+
+  it("copies, moves and deletes questions", async () => {
+    const set = await newSet();
+    const a = (await api<Question>("POST", `/sets/${set.id}/questions`, { ...single, text: "A" })).data;
+    const b = (await api<Question>("POST", `/sets/${set.id}/questions`, { ...single, text: "B" })).data;
+    const texts = async () => (await detail(set.id)).questions.map((q) => q.text);
+
+    expect((await api("POST", `/questions/${a.id}/copy`)).status).toBe(201);
+    expect(await texts()).toEqual(["A", "A", "B"]);
+    await api("POST", `/questions/${b.id}/move`, { direction: "up" });
+    expect(await texts()).toEqual(["A", "B", "A"]);
+    await api("POST", `/questions/${b.id}/move`, { direction: "up" });
+    await api("POST", `/questions/${b.id}/move`, { direction: "up" }); // already first: no change
+    expect(await texts()).toEqual(["B", "A", "A"]);
+    expect((await api("POST", `/questions/${b.id}/move`, { direction: "sideways" })).status).toBe(400);
+    expect((await api("DELETE", `/questions/${a.id}`)).status).toBe(200);
+    expect(await texts()).toEqual(["B", "A"]);
+    expect((await api("DELETE", `/questions/${a.id}`)).status).toBe(404);
+  });
+
+  it("copies a whole set; editing the copy leaves the original alone", async () => {
+    const set = await newSet();
+    await api("POST", `/sets/${set.id}/questions`, fill);
+    await api("POST", `/sets/${set.id}/questions`, single);
+    const { data: copy } = await api<QuestionSetSummary>("POST", `/sets/${set.id}/copy`);
+    expect(copy.name).toBe("第一課（複本）");
+    const c = await detail(copy.id);
+    expect(c.questions.map(({ id, ...q }) => q)).toEqual([fill, single]);
+    await api("DELETE", `/questions/${c.questions[0].id}`);
+    expect((await detail(set.id)).questions).toHaveLength(2);
   });
 });
