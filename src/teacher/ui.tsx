@@ -45,7 +45,7 @@ export function Loading({ error }: { error: string }) {
   return <main class="page">{error ? <ErrorText message={error} /> : <p>載入中…</p>}</main>;
 }
 
-export function Modal(props: { title: string; onClose: () => void; children: ComponentChildren }) {
+export function Modal(props: { title: string; onClose: () => void; wide?: boolean; children: ComponentChildren }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && props.onClose();
     window.addEventListener("keydown", onKey);
@@ -53,7 +53,7 @@ export function Modal(props: { title: string; onClose: () => void; children: Com
   }, [props.onClose]);
   return (
     <div class="overlay" onClick={(e) => e.target === e.currentTarget && props.onClose()}>
-      <div class="modal" role="dialog" aria-modal="true" aria-label={props.title}>
+      <div class={`modal${props.wide ? " modal-wide" : ""}`} role="dialog" aria-modal="true" aria-label={props.title}>
         <h2>{props.title}</h2>
         {props.children}
       </div>

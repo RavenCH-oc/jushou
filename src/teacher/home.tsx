@@ -5,10 +5,16 @@ import { ErrorText, formatTime, Loading, useAction, useLoad } from "./ui";
 import { MAX_CLASS_NAME } from "../shared/limits";
 import { MAX_SET_NAME } from "../shared/questions";
 import type { ClassSummary, QuestionSetSummary } from "../shared/types";
+import type { ActiveLesson } from "../shared/lesson";
 
 export function Home({ onLogout }: { onLogout: () => void }) {
   const { data, error } = useLoad(
-    () => Promise.all([api<ClassSummary[]>("GET", "/classes"), api<QuestionSetSummary[]>("GET", "/sets")]),
+    () =>
+      Promise.all([
+        api<ClassSummary[]>("GET", "/classes"),
+        api<QuestionSetSummary[]>("GET", "/sets"),
+        api<ActiveLesson | null>("GET", "/lessons/active"),
+      ]),
     [],
   );
 
@@ -18,19 +24,32 @@ export function Home({ onLogout }: { onLogout: () => void }) {
   };
 
   if (!data) return <Loading error={error} />;
-  const [classes, sets] = data;
+  const [classes, sets, active] = data;
   return (
     <main class="page">
       <header class="topbar">
         <h1>舉手</h1>
-        <button class="btn btn-secondary" onClick={logout}>
-          登出
-        </button>
+        <div class="row">
+          <a class={`btn${active ? " btn-secondary" : ""}`} href={href("/start")}>
+            開始上課
+          </a>
+          <button class="btn btn-secondary" onClick={logout}>
+            登出
+          </button>
+        </div>
       </header>
+      {active && (
+        <div class="card lesson-banner notice">
+          <p>上課中：{active.className}</p>
+          <a class="btn" href={href(`/lesson/${active.id}`)}>
+            回到課堂
+          </a>
+        </div>
+      )}
       <section>
         <div class="section-head">
           <h2>班級</h2>
-          <a class="btn" href={href("/new")}>
+          <a class="btn btn-secondary" href={href("/new")}>
             新增班級
           </a>
         </div>
@@ -52,7 +71,7 @@ export function Home({ onLogout }: { onLogout: () => void }) {
       <section class="home-section">
         <div class="section-head">
           <h2>題組</h2>
-          <a class="btn" href={href("/new-set")}>
+          <a class="btn btn-secondary" href={href("/new-set")}>
             新增題組
           </a>
         </div>

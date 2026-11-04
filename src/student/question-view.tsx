@@ -55,7 +55,7 @@ export function QuestionView({ q, number, answer, onAnswer = () => {} }: Props) 
 }
 
 // Fill-in text shows each blank as a numbered box, matching the inputs below.
-function QuestionText({ q }: { q: StudentQuestion }) {
+export function QuestionText({ q }: { q: StudentQuestion }) {
   if (!q.text) return <p class="qv-text qv-empty">（題目文字）</p>;
   if (q.type !== "fill") return <p class="qv-text">{q.text}</p>;
   const parts = q.text.split(/＿{3,}/);
