@@ -15,5 +15,9 @@
       "migrations_dir": "migrations"
     }
   ],
+  "durable_objects": {
+    "bindings": [{ "name": "LESSON_HUB", "class_name": "LessonHub" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LessonHub"] }],
   "observability": { "enabled": true }
 }

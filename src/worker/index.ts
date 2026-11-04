@@ -4,8 +4,26 @@ import { endSession, passwordMatches, requireTeacher, startSession } from "./aut
 import classes from "./classes";
 import groupings from "./groupings";
 import questionSets from "./question-sets";
+import lessons from "./lessons";
+import student from "./student";
+import { connect } from "./lesson-hub";
+import { fail } from "./util";
+
+export { LessonHub } from "./lesson-hub";
 
 const app = new Hono<AppEnv>();
+
+// Students have no login; see student.ts for how a phone proves who it is.
+app.route("/api/student", student);
+
+// Live "something changed" events for one lesson. No data goes through here,
+// so the connection needs no login (see docs/tasks/phase-3.md).
+app.get("/api/lessons/:id/ws", async (c) => {
+  if (c.req.header("Upgrade") !== "websocket") return fail(c, "這裡只接受即時連線。");
+  const lesson = await c.env.DB.prepare("SELECT 1 FROM lessons WHERE id = ? AND status = 'active'").bind(c.req.param("id")).first();
+  if (!lesson) return fail(c, "這堂課已經結束了。", 404);
+  return connect(c.env, c.req.param("id"), c.req.raw);
+});
 
 app.post("/api/teacher/login", async (c) => {
   const { TEACHER_PASSWORD: expected, SESSION_SECRET: secret } = c.env;
@@ -33,6 +51,7 @@ app.get("/api/teacher/me", (c) => c.json({ ok: true }));
 app.route("/api/teacher", classes);
 app.route("/api/teacher", groupings);
 app.route("/api/teacher", questionSets);
+app.route("/api/teacher", lessons);
 
 app.notFound((c) => c.json({ error: "找不到這個功能。" }, 404));
 

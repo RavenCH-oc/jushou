@@ -9,6 +9,7 @@ import { ClassPage } from "./class-page";
 import { GroupingPage, NewGrouping, Projection } from "./grouping";
 import { SetPage, SetPreview } from "./question-set";
 import { QuestionEditor } from "./question-editor";
+import { LessonPage, StartLesson } from "./lesson";
 
 type View = "loading" | "login" | "app" | "offline";
 
@@ -50,6 +51,8 @@ function Routes({ onLogout }: { onLogout: () => void }) {
   const path = useHashPath();
   let m;
   if ((m = match("/new", path))) return <NewClass />;
+  if ((m = match("/start/:classId?", path))) return <StartLesson classId={m.classId} />;
+  if ((m = match("/lesson/:id", path))) return <LessonPage key={m.id} id={m.id} />;
   if ((m = match("/class/:id/new-grouping", path))) return <NewGrouping classId={m.id} />;
   if ((m = match("/class/:id/:tab?", path))) return <ClassPage id={m.id} tab={m.tab} />;
   if ((m = match("/grouping/:id/show", path))) return <Projection id={m.id} />;

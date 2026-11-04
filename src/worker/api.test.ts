@@ -2,14 +2,18 @@ import { beforeEach, describe, expect, it } from "vitest";
 import app from "./index";
 import type { Bindings } from "./env";
 import { createTestDb } from "./test/d1";
+import { createFakeHub, type Broadcast } from "./test/hub";
 import type { ClassDetail, ClassSummary, GroupingDetail, GroupingSummary, ImportResult, QuestionSetDetail, QuestionSetSummary } from "../shared/types";
 import type { Question } from "../shared/questions";
 
 let env: Bindings;
 let cookie: string;
+let broadcasts: Broadcast[];
 
 beforeEach(async () => {
-  env = { DB: createTestDb(), TEACHER_PASSWORD: "pw", SESSION_SECRET: "test-secret" };
+  const hub = createFakeHub();
+  broadcasts = hub.calls;
+  env = { DB: createTestDb(), LESSON_HUB: hub.namespace, TEACHER_PASSWORD: "pw", SESSION_SECRET: "test-secret" };
   const res = await app.request(
     "/api/teacher/login",
     { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: "pw" }) },

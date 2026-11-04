@@ -5,6 +5,7 @@ import { passwordMatches, SESSION_COOKIE } from "./auth";
 
 const env: Bindings = {
   DB: {} as D1Database,
+  LESSON_HUB: {} as DurableObjectNamespace,
   TEACHER_PASSWORD: "correct horse",
   SESSION_SECRET: "test-secret-0123456789",
 };

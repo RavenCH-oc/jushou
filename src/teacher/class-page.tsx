@@ -23,9 +23,14 @@ export function ClassPage({ id, tab }: { id: string; tab: string }) {
       </a>
       <header class="topbar">
         <h1>{cls.name}</h1>
-        <p class="join-code">
-          加入碼 <strong>{cls.joinCode}</strong>
-        </p>
+        <div class="row row-center">
+          <p class="join-code">
+            加入碼 <strong>{cls.joinCode}</strong>
+          </p>
+          <a class="btn" href={href(`/start/${cls.id}`)}>
+            開始上課
+          </a>
+        </div>
       </header>
       <nav class="tabs">
         {TABS.map((t) => (

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { AppEnv } from "./env";
 import { checkClassName, checkSeat, checkStudentName, MAX_IMPORT_ROWS } from "../shared/limits";
 import type { ClassDetail, ClassSummary, GroupingSummary, ImportResult, Student } from "../shared/types";
+import { notify } from "./lesson-hub";
 import { fail, now, readBody, uniqueJoinCode } from "./util";
 
 const app = new Hono<AppEnv>();
@@ -84,10 +85,13 @@ app.post("/classes/:id/join-code", async (c) => {
   return c.json({ joinCode });
 });
 
-// Students, groupings, groups and memberships go with it via ON DELETE CASCADE.
+// Students, groupings, lessons and answers go with it via ON DELETE CASCADE.
 app.delete("/classes/:id", async (c) => {
-  const res = await c.env.DB.prepare("DELETE FROM classes WHERE id = ?").bind(c.req.param("id")).run();
+  const db = c.env.DB;
+  const lesson = await db.prepare("SELECT id FROM lessons WHERE class_id = ? AND status = 'active'").bind(c.req.param("id")).first<{ id: string }>();
+  const res = await db.prepare("DELETE FROM classes WHERE id = ?").bind(c.req.param("id")).run();
   if (!res.meta.changes) return fail(c, CLASS_GONE, 404);
+  if (lesson) await notify(c.env, lesson.id, "ended");
   return c.json({ ok: true });
 });
 
