@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 import type { AppEnv } from "./env";
 
-export function fail(c: Context<AppEnv>, message: string, status: 400 | 404 | 409 = 400) {
+export function fail(c: Context<AppEnv>, message: string, status: 400 | 403 | 404 | 409 = 400) {
   return c.json({ error: message }, status);
 }
 
