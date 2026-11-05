@@ -161,30 +161,31 @@ export function LessonPage({ id }: { id: string }) {
   const index = Math.max(0, questions.findIndex((q) => q.id === (focusId ?? currentId)));
   const q = questions[index];
   const joined = lesson.students.filter((s) => s.joined);
-  const step = (s: "open" | "close" | "reveal") =>
+  const step = (s: "open" | "close" | "reveal", target = q) =>
     action.run(async () => {
-      await api("POST", `/lesson-questions/${q.id}/${s}`);
+      await api("POST", `/lesson-questions/${target.id}/${s}`);
       await load();
     });
 
+  const next = questions[index + 1];
   let main;
   if (q.status === "pending") main = { label: currentId ? "出這一題" : "出第 1 題", run: () => step("open") };
   else if (q.status === "open") main = { label: "停止作答", run: () => step("close") };
   else if (q.status === "closed") main = { label: "公布答案", run: () => step("reveal") };
-  else if (index < questions.length - 1) main = { label: "下一題", run: () => setFocusId(questions[index + 1].id) };
+  // After revealing, the next question goes straight to the students.
+  else if (next?.status === "pending") main = { label: "出下一題", run: () => step("open", next) };
+  else if (next) main = { label: "下一題", run: () => setFocusId(next.id) };
   else main = { label: "結束上課", run: () => setDialog({ kind: "end" }) };
 
   return (
-    <main class="page page-wide lesson">
-      <header class="topbar">
-        <div>
-          <a class="back" href={href("/")}>
-            ← 回首頁（課會繼續進行）
-          </a>
-          <h1 class="lesson-title">
-            {lesson.className}・{lesson.setName}
-          </h1>
-        </div>
+    <main class="lesson">
+      <header class="lesson-bar">
+        <a class="back" href={href("/")}>
+          ← 回首頁（課會繼續進行）
+        </a>
+        <h1 class="lesson-title">
+          {lesson.className}・{lesson.setName}
+        </h1>
         <div class="row">
           <button class="btn btn-secondary" onClick={() => setDialog({ kind: "join" })}>
             加入碼
@@ -192,6 +193,7 @@ export function LessonPage({ id }: { id: string }) {
           <button class="btn btn-secondary" onClick={() => setDialog({ kind: "roster" })}>
             名單（{joined.length}）
           </button>
+          <FullscreenButton />
           <button class="btn btn-secondary" onClick={() => setDialog({ kind: "end" })}>
             結束上課
           </button>
@@ -233,25 +235,27 @@ export function LessonPage({ id }: { id: string }) {
                 <QuestionText q={toStudentView(q)} />
               </div>
             )}
-            {q.status !== "pending" && (
-              <p class="answered">
-                已作答 <strong>{q.stats.answered}</strong>／{joined.length} 人
-              </p>
-            )}
             {(q.status === "closed" || q.status === "revealed") && (
               <Results q={q} revealed={q.status === "revealed"} onEssays={() => setDialog({ kind: "essay-warn", q })} />
             )}
             <ErrorText message={action.error} />
-            <button class="btn btn-block btn-main" disabled={action.busy} onClick={main.run}>
-              {main.label}
-            </button>
+            <div class="lesson-foot">
+              {q.status !== "pending" && (
+                <p class="answered">
+                  已作答 <strong>{q.stats.answered}</strong>／{joined.length} 人
+                </p>
+              )}
+              <button class="btn btn-main" disabled={action.busy} onClick={main.run}>
+                {main.label}
+              </button>
+            </div>
           </section>
         </div>
       )}
       <OfflineNote connected={connected} />
 
       {dialog?.kind === "join" && (
-        <Modal title="加入碼" wide onClose={close}>
+        <Modal title="加入碼" full onClose={close}>
           <JoinPanel lesson={lesson} />
           <button class="btn btn-block" onClick={close}>
             關閉
@@ -355,20 +359,38 @@ export function LessonPage({ id }: { id: string }) {
   );
 }
 
+function FullscreenButton() {
+  const [on, setOn] = useState(!!document.fullscreenElement);
+  useEffect(() => {
+    const onChange = () => setOn(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+  if (!document.fullscreenEnabled) return null;
+  const toggle = () => (on ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
+  return (
+    <button class="btn btn-secondary" onClick={toggle}>
+      {on ? "離開全螢幕" : "全螢幕"}
+    </button>
+  );
+}
+
 function JoinPanel({ lesson }: { lesson: LessonDetail }) {
   const joined = lesson.students.filter((s) => s.joined).length;
   return (
     <div class="join-panel">
       <div class="join-text">
-        <p class="join-label">用手機打開</p>
-        <p class="join-url">{location.host}</p>
-        <p class="join-label">輸入加入碼</p>
+        <p class="join-label">用手機掃描 QR code，</p>
+        <p class="join-label">或打開下面的網址，輸入加入碼</p>
         <p class="join-code-huge">{lesson.joinCode}</p>
+        <p class="join-count">
+          已加入 <strong>{joined}</strong>／{lesson.students.length} 人
+        </p>
       </div>
-      <QrCode text={location.origin} />
-      <p class="join-count">
-        已加入 <strong>{joined}</strong>／{lesson.students.length} 人
-      </p>
+      <figure class="join-qr">
+        <QrCode text={`${location.origin}/?code=${lesson.joinCode}`} />
+        <figcaption class="join-url">{location.host}</figcaption>
+      </figure>
       <ul class="seat-grid" aria-label="已加入的座號">
         {lesson.students.map((s) => (
           <li key={s.id} class={s.joined ? "seat-in" : ""} title={s.name}>
@@ -381,11 +403,12 @@ function JoinPanel({ lesson }: { lesson: LessonDetail }) {
 }
 
 function QrCode({ text }: { text: string }) {
-  const { data, size } = encode(text, { border: 1 });
+  // A quiet zone of 4 modules, pure black on white: scannable from the back row.
+  const { data, size } = encode(text, { border: 4 });
   let path = "";
   data.forEach((row, y) => row.forEach((dark, x) => dark && (path += `M${x} ${y}h1v1h-1z`)));
   return (
-    <svg class="qr" viewBox={`0 0 ${size} ${size}`} role="img" aria-label="學生網址的 QR code" shape-rendering="crispEdges">
+    <svg class="qr" viewBox={`0 0 ${size} ${size}`} role="img" aria-label="加入這堂課的 QR code" shape-rendering="crispEdges">
       <rect width={size} height={size} fill="#fff" />
       <path d={path} fill="#000" />
     </svg>

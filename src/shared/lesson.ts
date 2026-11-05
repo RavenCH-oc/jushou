@@ -51,10 +51,27 @@ export type StudentCurrent = {
   reveal?: { result: GradeResult; question: Question }; // only once the teacher reveals it
 };
 
+// One line per question on the 下課 screen. Answers are never included;
+// questions the teacher didn't reveal only say "hidden".
+export type LessonResultItem = {
+  number: number;
+  snippet: string; // first 20 characters of the question
+  result: GradeResult["status"] | "hidden";
+  score: number | null;
+};
+
+export type LessonResult = {
+  setName: string;
+  items: LessonResultItem[];
+  score: number; // points this student got on revealed questions
+  max: number; // points of the revealed, auto-graded questions
+};
+
 export type StudentState = {
   className: string;
   lessonId: string | null; // the lesson in progress, if any
   me: { seat: number; name: string } | null; // who this phone is bound to
   seats?: SeatChoice[]; // only while `me` is null
   current: StudentCurrent | null; // the question the teacher pushed last
+  result?: LessonResult | null; // no lesson now: this student's results of today's last lesson
 };

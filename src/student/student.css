@@ -80,3 +80,24 @@
 .reveal-blanks .ok { color: #1b6e2a; }
 .reveal-blanks .no { color: var(--danger); }
 .essay-answer { white-space: pre-wrap; overflow-wrap: anywhere; padding: var(--space-2); background: var(--bg-soft); border-radius: var(--radius); }
+
+/* 下課 results */
+.result-total { margin: 0; text-align: center; font-size: 24px; }
+.result-total strong { font-size: 36px; }
+.result-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
+.result-item {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+}
+.result-snippet { overflow-wrap: anywhere; }
+.result-mark { font-weight: 700; margin-left: auto; }
+.result-correct { border-color: #1b6e2a; background: #eaf6ec; }
+.result-correct .result-mark { color: #1b6e2a; }
+.result-wrong { border-color: var(--danger); background: #fdeceb; }
+.result-wrong .result-mark { color: var(--danger); }
+.result-hidden .result-mark, .result-unanswered .result-mark { color: var(--text-muted); font-weight: 400; }

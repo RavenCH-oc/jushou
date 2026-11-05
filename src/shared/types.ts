@@ -13,6 +13,7 @@ export type ClassDetail = {
   joinCode: string;
   students: Student[];
   groupings: GroupingSummary[];
+  inLesson: boolean; // a lesson of this class is in progress
 };
 
 export type Group = { id: string; name: string; studentIds: string[] };

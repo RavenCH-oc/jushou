@@ -5,9 +5,15 @@ import "./student.css";
 import { ApiError, load, remembers, save, studentApi } from "./api";
 import { OfflineNote, useLive } from "./live";
 import { QuestionView } from "./question-view";
+import { readJoinLink } from "./join-link";
 import { Reveal } from "./reveal";
 import type { Answer } from "../shared/grading";
-import type { StudentCurrent, StudentState } from "../shared/lesson";
+import type { LessonResult, StudentCurrent, StudentState } from "../shared/lesson";
+
+// Opened from the QR code: skip typing the join code.
+const link = readJoinLink(location.href);
+if (link.cleanUrl !== null) history.replaceState(null, "", link.cleanUrl);
+if (link.code) save("code", link.code);
 
 function App() {
   const [code, setCode] = useState(() => load("code"));
@@ -148,7 +154,8 @@ function Classroom({ code, onLeave }: { code: string; onLeave: (message?: string
   };
 
   let screen;
-  if (!state.lessonId) screen = <NoLesson className={state.className} ended={sawLesson.current} onLeave={() => onLeave()} />;
+  if (!state.lessonId && state.result) screen = <LessonResultView result={state.result} onLeave={() => onLeave()} />;
+  else if (!state.lessonId) screen = <NoLesson className={state.className} ended={sawLesson.current} onLeave={() => onLeave()} />;
   else if (!state.me) screen = <SeatPicker code={code} state={state} onBound={refresh} />;
   else if (!state.current) screen = <Waiting me={state.me} onNotMe={notMe} />;
   else {
@@ -189,6 +196,47 @@ function NoLesson({ className, ended, onLeave }: { className: string; ended: boo
       <p class="muted">{className}</p>
       {ended ? <p class="big-status">這堂課結束了，謝謝！</p> : <p class="big-status">老師還沒開始上課，請稍等</p>}
       {!ended && <p class="muted">老師開始上課後，這個畫面會自動換過去。</p>}
+      <button class="btn btn-secondary btn-block" onClick={onLeave}>
+        換一個加入碼
+      </button>
+    </div>
+  );
+}
+
+const RESULT_LABEL = {
+  correct: "○ 答對",
+  wrong: "✕ 答錯",
+  unanswered: "沒作答",
+  pending: "老師之後批改",
+  hidden: "老師沒有公布答案",
+};
+
+// 下課: how this student did on each question of today's last lesson.
+function LessonResultView({ result, onLeave }: { result: LessonResult; onLeave: () => void }) {
+  return (
+    <div class="stack">
+      <p class="big-status center">這堂課結束了，謝謝！</p>
+      <p class="muted center">{result.setName}</p>
+      {result.max > 0 && (
+        <p class="result-total">
+          總分 <strong>{result.score}</strong>／{result.max} 分
+        </p>
+      )}
+      <ol class="result-list">
+        {result.items.map((item) => (
+          <li key={item.number} class={`result-item result-${item.result}`}>
+            <span class="result-snippet">
+              {item.number}. {item.snippet}
+            </span>
+            <span class="result-mark">
+              {RESULT_LABEL[item.result]}
+              {item.result === "correct" && `（${item.score} 分）`}
+            </span>
+          </li>
+        ))}
+      </ol>
+      {result.items.some((i) => i.result === "pending") && <p class="muted">簡答題老師批改後另外計分。</p>}
+      <p class="muted center">老師開始下一堂課時，這個畫面會自動換過去。</p>
       <button class="btn btn-secondary btn-block" onClick={onLeave}>
         換一個加入碼
       </button>
