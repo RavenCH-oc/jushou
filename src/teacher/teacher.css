@@ -415,3 +415,4 @@ a.btn { text-decoration: none; }
 .score-button { min-width: 72px; min-height: 72px; font-size: 28px; }
 .score-input { width: 8em; font-size: 28px; }
 .big-text { font-size: 26px; font-weight: 700; }
+.table a { color: var(--primary); }

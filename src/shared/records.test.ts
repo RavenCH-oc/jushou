@@ -91,6 +91,9 @@ describe("scoring rules", () => {
     expect(single).toMatchObject({ answered: 2, correct: 2, rate: 2 / 3 });
     // A got 4, C answered nothing (0), B not graded yet so left out.
     expect(essay).toMatchObject({ answered: 2, rate: null, average: 2, ungraded: 1 });
+    // Before any 簡答 is graded there is no average yet (not 0).
+    const fresh = analyze({ ...record, answers: record.answers.filter((x) => x.questionId !== "essay" || x.status === "pending") });
+    expect(fresh.questions[2].average).toBeNull();
   });
 
   it("rates from SQL summaries", () => {

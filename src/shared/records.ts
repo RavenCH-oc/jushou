@@ -108,7 +108,8 @@ export function analyze(r: LessonRecord) {
     const cells = present.map((s) => s.cells[i]);
     const answered = cells.filter((c) => c.kind !== "unanswered").length;
     const correct = cells.filter((c) => c.kind === "correct").length;
-    const graded = cells.filter((c) => c.kind === "graded" || c.kind === "unanswered");
+    // 簡答 average: graded answers, with 沒作答 as 0; nothing to show until one is graded.
+    const graded = cells.some((c) => c.kind === "graded") ? cells.filter((c) => c.kind === "graded" || c.kind === "unanswered") : [];
     return {
       q,
       number: i + 1,

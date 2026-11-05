@@ -103,17 +103,19 @@ function ExportDialog({ className, list, onClose }: { className: string; list: L
   const all = picked.size === list.length;
 
   const run = () =>
-    action.run(async () => {
-      const ids = list.filter((l) => picked.has(l.id)).map((l) => l.id);
-      const records: LessonRecord[] = [];
-      for (const [i, id] of ids.entries()) {
-        setProgress(`準備中 ${i + 1}／${ids.length}`);
-        records.push(parseRecord(await api<RecordDetail>("GET", `/records/${id}`)));
-      }
-      const { downloadClass } = await import("./export");
-      downloadClass(className, records);
-      onClose();
-    }).finally(() => setProgress(""));
+    action
+      .run(async () => {
+        const ids = list.filter((l) => picked.has(l.id)).map((l) => l.id);
+        const records: LessonRecord[] = [];
+        for (const [i, id] of ids.entries()) {
+          setProgress(`準備中 ${i + 1}／${ids.length}`);
+          records.push(parseRecord(await api<RecordDetail>("GET", `/records/${id}`)));
+        }
+        const { downloadClass } = await import("./export");
+        downloadClass(className, records);
+        onClose();
+      })
+      .finally(() => setProgress(""));
 
   return (
     <Modal title="匯出多堂課" wide onClose={onClose}>
@@ -191,11 +193,12 @@ export function RecordPage({ id, tab, qid }: { id: string; tab?: string; qid?: s
   if (!record || !a) return <Loading error={error} />;
 
   const onGraded = (questionId: string, studentId: string, score: number) =>
-    setRecord((r) =>
-      r && {
-        ...r,
-        answers: r.answers.map((x) => (x.questionId === questionId && x.studentId === studentId ? { ...x, status: "graded", score } : x)),
-      },
+    setRecord(
+      (r) =>
+        r && {
+          ...r,
+          answers: r.answers.map((x) => (x.questionId === questionId && x.studentId === studentId ? { ...x, status: "graded", score } : x)),
+        },
     );
   const firstUngraded = a.questions.find((x) => x.ungraded);
   const tabs = TABS.filter((t) => t.key !== "groups" || record.groupingCount > 0);
@@ -219,28 +222,30 @@ export function RecordPage({ id, tab, qid }: { id: string; tab?: string; qid?: s
       <h1>
         {record.className}・{record.setName}・{formatTaipei(record.startedAt)}
       </h1>
-      <div class="record-summary">
-        <p>
-          出席{" "}
-          <strong>
-            {a.present}／{a.total}
-          </strong>
-        </p>
-        <p>
-          平均分數{" "}
-          <strong>
-            {oneDecimal(a.average)}／{a.max}
-          </strong>
-        </p>
-        {firstUngraded && (
-          <a class="badge badge-link" href={href(`/record/${id}/q/${firstUngraded.q.id}`)}>
-            還有 {a.ungraded} 份簡答沒批改
-          </a>
-        )}
-        <button class="btn record-download" disabled={exporting.busy} onClick={downloadExcel}>
-          {exporting.busy ? "準備中…" : "下載 Excel"}
-        </button>
-      </div>
+      {!qid && (
+        <div class="record-summary">
+          <p>
+            出席{" "}
+            <strong>
+              {a.present}／{a.total}
+            </strong>
+          </p>
+          <p>
+            平均分數{" "}
+            <strong>
+              {oneDecimal(a.average)}／{a.max}
+            </strong>
+          </p>
+          {firstUngraded && (
+            <a class="badge badge-link" href={href(`/record/${id}/q/${firstUngraded.q.id}`)}>
+              還有 {a.ungraded} 份簡答沒批改
+            </a>
+          )}
+          <button class="btn record-download" disabled={exporting.busy} onClick={downloadExcel}>
+            {exporting.busy ? "準備中…" : "下載 Excel"}
+          </button>
+        </div>
+      )}
       <ErrorText message={exporting.error} />
 
       {qid ? (
@@ -293,9 +298,7 @@ export function RecordPage({ id, tab, qid }: { id: string; tab?: string; qid?: s
 
 function ScoreTable({ a }: { a: Analysis }) {
   const [byScore, setByScore] = useState(false);
-  const rows = byScore
-    ? [...a.students].sort((x, y) => (y.score ?? -1) - (x.score ?? -1) || x.seat - y.seat)
-    : a.students;
+  const rows = byScore ? [...a.students].sort((x, y) => (y.score ?? -1) - (x.score ?? -1) || x.seat - y.seat) : a.students;
   return (
     <div class="table-wrap">
       <table class="table score-table">
@@ -500,7 +503,8 @@ function QuestionDetail(props: {
           <p class="correct-rate">
             正確率 {percent(stats.rate)}（答對 {stats.correct}／出席 {a.present} 人）
           </p>
-          <AnswerBars q={q} stats={distribution(q, presentAnswers(a, q))} revealed />
+          {/* Percentages of everyone present, like 正確率 (沒作答 are listed below). */}
+          <AnswerBars q={q} stats={{ ...distribution(q, presentAnswers(a, q)), answered: a.present }} revealed />
           <WhoAnswered a={a} q={q} />
         </>
       )}
@@ -651,24 +655,22 @@ function EssayGrader(props: {
           </strong>
         </p>
         <div class="segmented" role="group" aria-label="顯示哪些學生">
-          <button class={`btn btn-small${onlyUngraded ? "" : " btn-secondary"}`} aria-pressed={onlyUngraded} onClick={() => setOnlyUngraded(true)}>
+          <button
+            class={`btn btn-small${onlyUngraded ? "" : " btn-secondary"}`}
+            aria-pressed={onlyUngraded}
+            onClick={() => setOnlyUngraded(true)}
+          >
             只看沒批改的（{ungradedCount}）
           </button>
-          <button class={`btn btn-small${onlyUngraded ? " btn-secondary" : ""}`} aria-pressed={!onlyUngraded} onClick={() => setOnlyUngraded(false)}>
+          <button
+            class={`btn btn-small${onlyUngraded ? " btn-secondary" : ""}`}
+            aria-pressed={!onlyUngraded}
+            onClick={() => setOnlyUngraded(false)}
+          >
             全部（{items.length}）
           </button>
         </div>
       </div>
-      <ul class="grader-names">
-        {shown.map((x) => (
-          <li key={x.s.id}>
-            <button class={`grader-name${x.s.id === currentId ? " grader-name-on" : ""}`} aria-current={x.s.id === currentId} onClick={() => setCurrentId(x.s.id)}>
-              {x.s.seat} {x.s.name}
-              {x.ans.status === "graded" && <span class="grader-score">✓ {x.ans.score} 分</span>}
-            </button>
-          </li>
-        ))}
-      </ul>
 
       {!current ? (
         <div class="card grader-done">
@@ -723,6 +725,21 @@ function EssayGrader(props: {
           <ErrorText message={action.error} />
         </div>
       )}
+      <p class="grader-label">點名字可以直接跳到那位學生：</p>
+      <ul class="grader-names">
+        {shown.map((x) => (
+          <li key={x.s.id}>
+            <button
+              class={`grader-name${x.s.id === currentId ? " grader-name-on" : ""}`}
+              aria-current={x.s.id === currentId}
+              onClick={() => setCurrentId(x.s.id)}
+            >
+              {x.s.seat} {x.s.name}
+              {x.ans.status === "graded" && <span class="grader-score">✓ {x.ans.score} 分</span>}
+            </button>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
