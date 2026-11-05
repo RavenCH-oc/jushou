@@ -3,7 +3,7 @@ import app from "./index";
 import type { Bindings } from "./env";
 import { createTestDb } from "./test/d1";
 import { createFakeHub } from "./test/hub";
-import type { ClassSummary, QuestionSetSummary } from "../shared/types";
+import type { ClassSummary, GroupingDetail, GroupingSummary, QuestionSetSummary } from "../shared/types";
 import type { QuestionData } from "../shared/questions";
 import type { LessonDetail, StudentState } from "../shared/lesson";
 import { analyze, parseRecord, summaryRate, type LessonSummary, type RecordDetail, type StudentHistory } from "../shared/records";
@@ -32,7 +32,8 @@ async function call<T>(path: string, method: string, headers: Record<string, str
   return { status: res.status, data: (await res.json()) as T };
 }
 
-const teacher = <T = unknown>(method: string, path: string, body?: unknown) => call<T>(`/api/teacher${path}`, method, { Cookie: cookie }, body);
+const teacher = <T = unknown>(method: string, path: string, body?: unknown) =>
+  call<T>(`/api/teacher${path}`, method, { Cookie: cookie }, body);
 
 function phone(code: string) {
   const token = crypto.randomUUID().replaceAll("-", "");
@@ -42,6 +43,7 @@ function phone(code: string) {
     state: () => send<StudentState>("GET", "/state"),
     bind: (seat: number) => send("POST", "/bind", { seat }),
     answer: (questionId: string, answer: unknown) => send("POST", "/answer", { questionId, answer }),
+    unbind: () => send("POST", "/unbind"), // 「不是我？」
   };
 }
 
@@ -88,9 +90,15 @@ async function runLesson() {
   await p2.answer(essay.id, "很囉嗦");
   await teacher("POST", `/lesson-questions/${essay.id}/close`);
   await teacher("POST", `/lesson-questions/${essay.id}/reveal`);
+  // Grouped in the middle of the lesson: still part of its record.
+  const { data: grouping } = await teacher<GroupingSummary>("POST", `/classes/${cls.id}/groupings`, {
+    name: "國文小組",
+    mode: "random",
+    groupCount: 2,
+  });
   await teacher("POST", `/lessons/${lesson.id}/end`);
   const students = (await teacher<RecordDetail>("GET", `/records/${lesson.id}`)).data.students;
-  return { cls, id: lesson.id, tf, single, essay, students, p1 };
+  return { cls, id: lesson.id, tf, single, essay, students, p1, grouping };
 }
 
 describe("records API", () => {
@@ -119,7 +127,15 @@ describe("records API", () => {
     expect(list.data).toHaveLength(1);
     expect(recent.data[0].id).toBe(id);
     // tf 1 + single 2 + essay 5; the fill question was never asked.
-    expect(list.data[0]).toMatchObject({ className: "高二孝班", setName: "出師表", present: 3, total: 4, max: 8, scoreSum: 1 + 2 + 2, ungraded: 2 });
+    expect(list.data[0]).toMatchObject({
+      className: "高二孝班",
+      setName: "出師表",
+      present: 3,
+      total: 4,
+      max: 8,
+      scoreSum: 1 + 2 + 2,
+      ungraded: 2,
+    });
     const a = analyze(parseRecord(detail.data));
     expect(a.max).toBe(list.data[0].max);
     expect(a.present).toBe(list.data[0].present);
@@ -163,10 +179,12 @@ describe("records API", () => {
     const { id, cls } = await runLesson();
     const count = async (table: string) => (await env.DB.prepare(`SELECT COUNT(*) AS n FROM ${table}`).first<{ n: number }>())?.n;
     expect(await count("answers")).toBe(6);
+    expect(await count("lesson_groups")).toBe(4);
     expect((await teacher("DELETE", `/records/${id}`)).status).toBe(200);
     expect(await count("answers")).toBe(0);
     expect(await count("lesson_students")).toBe(0);
     expect(await count("lesson_questions")).toBe(0);
+    expect(await count("lesson_groups")).toBe(0);
     expect((await teacher("GET", `/records/${id}`)).status).toBe(404);
     expect((await teacher<LessonSummary[]>("GET", `/classes/${cls.id}/records`)).data).toEqual([]);
     expect(await count("students")).toBe(4); // the roster stays
@@ -187,6 +205,103 @@ describe("records API", () => {
     const h4 = (await teacher<StudentHistory>("GET", `/students/${students[3].id}/history`)).data;
     expect(h4.lessons[0]).toMatchObject({ present: false });
   });
+
+  it("依分組看 keeps the groups as they were when the lesson ended", async () => {
+    const { cls, id, grouping, students } = await runLesson();
+    const then = (await teacher<GroupingDetail>("GET", `/groupings/${grouping.id}`)).data;
+    const record = async () => (await teacher<RecordDetail>("GET", `/records/${id}`)).data;
+    const expected = [
+      { id: grouping.id, name: "國文小組", groups: then.groups.map((g) => ({ name: g.name, studentIds: [...g.studentIds].sort() })) },
+    ];
+    const saved = async () => {
+      const r = await record();
+      return r.groupings?.map((g) => ({ ...g, groups: g.groups.map((x) => ({ ...x, studentIds: [...x.studentIds].sort() })) }));
+    };
+    expect(await saved()).toEqual(expected);
+    expect((await record()).groupingCount).toBe(1);
+
+    // Changing the class's groups afterwards leaves the record alone.
+    await teacher("PATCH", `/groupings/${grouping.id}`, { name: "改過的名字" });
+    const mover = then.groups[0].studentIds[0];
+    await teacher("PUT", `/groupings/${grouping.id}/members/${mover}`, { groupId: then.groups[1].id });
+    await teacher("POST", `/classes/${cls.id}/groupings`, { name: "新的分組", mode: "random", groupCount: 2 });
+    expect(await saved()).toEqual(expected);
+    await teacher("DELETE", `/groupings/${grouping.id}`);
+    expect(await saved()).toEqual(expected);
+    expect((await record()).groupingCount).toBe(1);
+
+    // A student deleted from the roster drops out of the snapshot too.
+    await teacher("DELETE", `/students/${students[3].id}`);
+    const left = (await record()).groupings![0].groups.flatMap((g) => g.studentIds);
+    expect(left.sort()).toEqual(
+      students
+        .slice(0, 3)
+        .map((s) => s.id)
+        .sort(),
+    );
+  });
+
+  it("starting a new lesson ends the old one with its groups saved", async () => {
+    const { cls, lesson } = await activeLesson();
+    await teacher("POST", `/classes/${cls.id}/groupings`, { name: "報告分組", mode: "random", groupCount: 1 });
+    // What 開始上課 does when another lesson is still going: end it, then start.
+    const { data: set } = await teacher<QuestionSetSummary>("POST", "/sets", { name: "師說" });
+    await teacher("POST", `/sets/${set.id}/questions`, QUESTIONS[0]);
+    expect((await teacher("POST", "/lessons", { classId: cls.id, setId: set.id })).status).toBe(409);
+    await teacher("POST", `/lessons/${lesson.id}/end`);
+    expect((await teacher("POST", "/lessons", { classId: cls.id, setId: set.id })).status).toBe(201);
+    const old = (await teacher<RecordDetail>("GET", `/records/${lesson.id}`)).data;
+    expect(old.groupings).toEqual([
+      { id: expect.any(String), name: "報告分組", groups: [{ name: expect.any(String), studentIds: [expect.any(String)] }] },
+    ]);
+    // Ending twice doesn't copy the groups twice.
+    await teacher("POST", `/lessons/${lesson.id}/end`);
+    expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM lesson_groups").first<{ n: number }>())?.n).toBe(1);
+  });
+
+  it("lessons that ended before groups were saved fall back to the current groups", async () => {
+    const { id } = await runLesson();
+    await env.DB.prepare("DELETE FROM lesson_groups").run();
+    await env.DB.prepare("UPDATE lessons SET groups_saved = 0").run();
+    const detail = (await teacher<RecordDetail>("GET", `/records/${id}`)).data;
+    expect(detail.groupings).toBeNull();
+    expect(detail.groupingCount).toBe(1); // the class's grouping now
+  });
+
+  it("a student who answered and was then unbound still counts as present", async () => {
+    const { data: cls } = await teacher<ClassSummary>("POST", "/classes", { name: "高二孝班" });
+    const rows = [1, 2].map((seat) => ({ seat, name: `學生${seat}` }));
+    await teacher("POST", `/classes/${cls.id}/students/import`, { rows, onConflict: "skip" });
+    const { data: set } = await teacher<QuestionSetSummary>("POST", "/sets", { name: "出師表" });
+    for (const q of QUESTIONS.slice(0, 2)) await teacher("POST", `/sets/${set.id}/questions`, q);
+    const { data: lesson } = await teacher<{ id: string }>("POST", "/lessons", { classId: cls.id, setId: set.id });
+    const { data: live } = await teacher<LessonDetail>("GET", `/lessons/${lesson.id}`);
+    const [tf, single] = live.questions;
+    const [p1, p2] = [phone(live.joinCode), phone(live.joinCode)];
+    await p1.bind(1);
+    await p1.state();
+    await p2.bind(2);
+    await p2.state();
+    await teacher("POST", `/lesson-questions/${tf.id}/open`);
+    await p1.answer(tf.id, true);
+    await p2.answer(tf.id, true);
+    // 學生1 taps 「不是我？」, 學生2 is unbound by the teacher; neither comes back.
+    await p1.unbind();
+    const s2 = live.students[1].id;
+    await teacher("POST", `/students/${s2}/unbind`);
+    // The lesson screen's 已加入 still drops them.
+    expect((await teacher<LessonDetail>("GET", `/lessons/${lesson.id}`)).data.students.map((s) => s.joined)).toEqual([false, false]);
+    await teacher("POST", `/lesson-questions/${single.id}/open`);
+    await teacher("POST", `/lessons/${lesson.id}/end`);
+
+    const detail = (await teacher<RecordDetail>("GET", `/records/${lesson.id}`)).data;
+    expect(detail.students.map((s) => s.present)).toEqual([true, true]);
+    expect(analyze(parseRecord(detail)).students.map((s) => s.score)).toEqual([1, 1]);
+    const [summary] = (await teacher<LessonSummary[]>("GET", `/classes/${cls.id}/records`)).data;
+    expect(summary).toMatchObject({ present: 2, max: 3, scoreSum: 2 });
+    const history = (await teacher<StudentHistory>("GET", `/students/${s2}/history`)).data;
+    expect(history.lessons[0]).toMatchObject({ present: true, score: 1, max: 3 });
+  });
 });
 
 describe("summaries stay cheap with a semester of data", () => {
@@ -201,7 +316,11 @@ describe("summaries stay cheap with a semester of data", () => {
     for (let l = 0; l < 40; l++) {
       const lid = `L${l}`;
       const day = new Date(Date.UTC(2026, 8, 1 + l, 2)).toISOString();
-      stmts.push(db.prepare("INSERT INTO lessons (id, class_id, set_name, status, started_at, ended_at) VALUES (?, ?, ?, 'ended', ?, ?)").bind(lid, cls.id, `第${l}課`, day, day));
+      stmts.push(
+        db
+          .prepare("INSERT INTO lessons (id, class_id, set_name, status, started_at, ended_at) VALUES (?, ?, ?, 'ended', ?, ?)")
+          .bind(lid, cls.id, `第${l}課`, day, day),
+      );
       for (const sid of studentIds.slice(0, 28)) stmts.push(db.prepare("INSERT INTO lesson_students VALUES (?, ?, ?)").bind(lid, sid, day));
       for (let q = 0; q < 20; q++) {
         const qid = `${lid}Q${q}`;
@@ -213,7 +332,9 @@ describe("summaries stay cheap with a semester of data", () => {
         for (const [i, sid] of studentIds.slice(0, 28).entries()) {
           const right = (i + q + l) % 3 !== 0;
           stmts.push(
-            db.prepare("INSERT INTO answers VALUES (?, ?, ?, ?, ?, NULL, ?)").bind(qid, sid, right ? "0" : "1", right ? "correct" : "wrong", right ? 1 : 0, day),
+            db
+              .prepare("INSERT INTO answers VALUES (?, ?, ?, ?, ?, NULL, ?)")
+              .bind(qid, sid, right ? "0" : "1", right ? "correct" : "wrong", right ? 1 : 0, day),
           );
         }
       }

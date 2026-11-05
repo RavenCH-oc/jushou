@@ -1,6 +1,8 @@
 // 上課紀錄: the scoring rules for lesson records (docs/tasks/phase-4.md).
 // Every page and the Excel export count with these functions, so they always agree.
 // The SQL summaries in src/worker/records.ts follow the same rules.
+// 出席 (present): joined the lesson, or sent at least one answer in it — a student
+// unbound mid-lesson (換手機) who never came back still keeps what they handed in.
 import type { Answer, GradeResult } from "./grading";
 import { optionLetter, typeLabel, type Question } from "./questions";
 import type { QuestionStats, QuestionStatus } from "./lesson";
@@ -13,7 +15,7 @@ export type LessonSummary = {
   className: string;
   setName: string;
   startedAt: string;
-  present: number; // students who joined
+  present: number; // students who joined or answered
   total: number; // students in the class now
   max: number; // points of the questions that were asked
   scoreSum: number; // points of all present students together
@@ -37,11 +39,16 @@ export type RecordDetail = {
   className: string;
   setName: string;
   startedAt: string;
-  groupingCount: number;
+  groupingCount: number; // groupings to show in 依分組看
+  // The groups as they were when the lesson ended; null for lessons that ended before
+  // this was recorded (the page then shows the class's current groups).
+  groupings: RecordGrouping[] | null;
   students: { id: string; seat: number; name: string; present: boolean }[];
   questions: RecordQuestion[]; // all of them, in order; see askedQuestions
   answers: RecordAnswerRow[];
 };
+
+export type RecordGrouping = { id: string; name: string; groups: { name: string; studentIds: string[] }[] };
 
 export type StudentHistory = {
   student: { id: string; seat: number; name: string; classId: string; className: string };

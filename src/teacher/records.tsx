@@ -2,6 +2,7 @@
 // stats, groups, question detail and 簡答 grading), and one student's history.
 // All numbers come from src/shared/records.ts so the pages and Excel agree.
 import { useEffect, useMemo, useState } from "preact/hooks";
+import type { ComponentChild } from "preact";
 import { api } from "./api";
 import { go, href } from "./router";
 import { Confirm, ErrorText, Loading, Modal, useAction, useLoad } from "./ui";
@@ -386,32 +387,45 @@ function QuestionTable({ id, a }: { id: string; a: Analysis }) {
   );
 }
 
-// Groups as the class has them now (not as they were during the lesson).
+type Groups = { name: string; studentIds: string[] }[];
+
+// The groups as they were when the lesson ended. Lessons that ended before those were
+// recorded fall back to the class's groups as they are now, and say so.
 function GroupView({ record, a }: { record: LessonRecord; a: Analysis }) {
+  if (!record.groupings) return <CurrentGroupView record={record} a={a} />;
+  const groupings = record.groupings;
+  return <GroupingPicker groupings={groupings} render={(id) => <GroupTable groups={groupings.find((g) => g.id === id)!.groups} a={a} />} />;
+}
+
+function CurrentGroupView({ record, a }: { record: LessonRecord; a: Analysis }) {
   const { data: cls } = useLoad(() => api<ClassDetail>("GET", `/classes/${record.classId}`), [record.classId]);
-  const [groupingId, setGroupingId] = useState<string | null>(null);
-  const chosen = groupingId ?? cls?.groupings[0]?.id ?? null;
-  const { data: grouping, error } = useLoad(
-    () => (chosen ? api<GroupingDetail>("GET", `/groupings/${chosen}`) : Promise.resolve(null)),
-    [chosen],
-  );
   if (!cls) return <p>載入中…</p>;
-  if (!cls.groupings.length) return <p class="muted">這個班目前沒有分組。</p>;
-
-  const byId = new Map(a.students.map((s) => [s.id, s]));
-  const placed = new Set(grouping?.groups.flatMap((g) => g.studentIds));
-  const groups = grouping
-    ? [
-        ...grouping.groups.map((g) => ({ name: g.name, ids: g.studentIds })),
-        { name: "未分組", ids: a.students.map((s) => s.id).filter((id) => !placed.has(id)) },
-      ].filter((g) => g.ids.length)
-    : [];
-
   return (
     <section class="stack">
-      {cls.groupings.length > 1 && (
+      <p class="muted">這堂課沒有記錄當時的分組，以下是現在的分組。</p>
+      {cls.groupings.length ? (
+        <GroupingPicker groupings={cls.groupings} render={(id) => <CurrentGroupTable key={id} id={id} a={a} />} />
+      ) : (
+        <p class="muted">這個班目前沒有分組。</p>
+      )}
+    </section>
+  );
+}
+
+function CurrentGroupTable({ id, a }: { id: string; a: Analysis }) {
+  const { data: grouping, error } = useLoad(() => api<GroupingDetail>("GET", `/groupings/${id}`), [id]);
+  if (error) return <ErrorText message={error} />;
+  return grouping ? <GroupTable groups={grouping.groups.map((g) => ({ name: g.name, studentIds: g.studentIds }))} a={a} /> : <p>載入中…</p>;
+}
+
+function GroupingPicker({ groupings, render }: { groupings: { id: string; name: string }[]; render: (id: string) => ComponentChild }) {
+  const [groupingId, setGroupingId] = useState<string | null>(null);
+  const chosen = groupings.find((g) => g.id === groupingId)?.id ?? groupings[0].id;
+  return (
+    <section class="stack">
+      {groupings.length > 1 && (
         <div class="choices choices-inline">
-          {cls.groupings.map((g) => (
+          {groupings.map((g) => (
             <label key={g.id} class={`choice${g.id === chosen ? " choice-on" : ""}`}>
               <input type="radio" name="grouping" checked={g.id === chosen} onChange={() => setGroupingId(g.id)} />
               {g.name}
@@ -419,37 +433,44 @@ function GroupView({ record, a }: { record: LessonRecord; a: Analysis }) {
           ))}
         </div>
       )}
-      <ErrorText message={error} />
-      {grouping && (
-        <table class="table records-table">
-          <thead>
-            <tr>
-              <th>組別</th>
-              <th>出席</th>
-              <th>平均總分</th>
-            </tr>
-          </thead>
-          <tbody>
-            {groups.map((g) => {
-              const members = g.ids.map((id) => byId.get(id)).filter((s) => !!s);
-              const present = members.filter((s) => s.present);
-              const avg = present.length ? present.reduce((sum, s) => sum + (s.score ?? 0), 0) / present.length : null;
-              return (
-                <tr key={g.name}>
-                  <td>{g.name}</td>
-                  <td>
-                    {present.length}／{members.length}
-                  </td>
-                  <td>
-                    {oneDecimal(avg)}／{a.max}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
+      {render(chosen)}
     </section>
+  );
+}
+
+function GroupTable({ groups, a }: { groups: Groups; a: Analysis }) {
+  const byId = new Map(a.students.map((s) => [s.id, s]));
+  const placed = new Set(groups.flatMap((g) => g.studentIds));
+  const rows = [...groups, { name: "未分組", studentIds: a.students.map((s) => s.id).filter((id) => !placed.has(id)) }];
+  return (
+    <table class="table records-table">
+      <thead>
+        <tr>
+          <th>組別</th>
+          <th>出席</th>
+          <th>平均總分</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((g, i) => {
+          const members = g.studentIds.map((id) => byId.get(id)).filter((s) => !!s);
+          if (!members.length) return null;
+          const present = members.filter((s) => s.present);
+          const avg = present.length ? present.reduce((sum, s) => sum + (s.score ?? 0), 0) / present.length : null;
+          return (
+            <tr key={i}>
+              <td>{g.name}</td>
+              <td>
+                {present.length}／{members.length}
+              </td>
+              <td>
+                {oneDecimal(avg)}／{a.max}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }
 
