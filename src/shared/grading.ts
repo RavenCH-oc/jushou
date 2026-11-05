@@ -12,7 +12,8 @@ export type AnswerFor = {
 export type Answer = AnswerFor[QuestionType];
 
 export type GradeResult = {
-  status: "correct" | "wrong" | "unanswered" | "pending"; // pending = 簡答, teacher grades later
+  // pending = 簡答 the teacher hasn't graded yet; graded = the teacher gave it a score.
+  status: "correct" | "wrong" | "unanswered" | "pending" | "graded";
   score: number | null; // null while pending
   blanks?: boolean[]; // fill only: whether each blank is right
 };

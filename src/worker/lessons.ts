@@ -61,7 +61,10 @@ app.post("/lessons", async (c) => {
   const { classId, setId } = await readBody(c);
   const db = c.env.DB;
   const [cls, set, active] = await Promise.all([
-    db.prepare("SELECT id, (SELECT COUNT(*) FROM students WHERE class_id = classes.id) AS n FROM classes WHERE id = ?").bind(classId).first<{ id: string; n: number }>(),
+    db
+      .prepare("SELECT id, (SELECT COUNT(*) FROM students WHERE class_id = classes.id) AS n FROM classes WHERE id = ?")
+      .bind(classId)
+      .first<{ id: string; n: number }>(),
     db.prepare("SELECT id, name FROM question_sets WHERE id = ?").bind(setId).first<{ id: string; name: string }>(),
     activeLesson(db),
   ]);
@@ -103,7 +106,15 @@ app.get("/lessons/:id", async (c) => {
        FROM lessons l JOIN classes c ON c.id = l.class_id WHERE l.id = ?`,
     )
     .bind(c.req.param("id"))
-    .first<{ id: string; status: "active" | "ended"; class_id: string; set_name: string; current_question_id: string | null; name: string; join_code: string }>();
+    .first<{
+      id: string;
+      status: "active" | "ended";
+      class_id: string;
+      set_name: string;
+      current_question_id: string | null;
+      name: string;
+      join_code: string;
+    }>();
   if (!lesson) return fail(c, LESSON_GONE, 404);
 
   const [students, joined, questions, answers] = await Promise.all([
@@ -150,7 +161,9 @@ app.post("/lesson-questions/:id/:step", async (c) => {
   const [from, to] = STEPS[step];
   const db = c.env.DB;
   const row = await db
-    .prepare("SELECT q.id, q.status, q.lesson_id, l.status AS lesson_status FROM lesson_questions q JOIN lessons l ON l.id = q.lesson_id WHERE q.id = ?")
+    .prepare(
+      "SELECT q.id, q.status, q.lesson_id, l.status AS lesson_status FROM lesson_questions q JOIN lessons l ON l.id = q.lesson_id WHERE q.id = ?",
+    )
     .bind(c.req.param("id"))
     .first<{ id: string; status: QuestionStatus; lesson_id: string; lesson_status: string }>();
   if (!row) return fail(c, QUESTION_GONE, 404);
@@ -182,7 +195,20 @@ app.get("/lesson-questions/:id/essays", async (c) => {
 app.post("/lessons/:id/end", async (c) => {
   const db = c.env.DB;
   const id = c.req.param("id");
-  const res = await db.prepare("UPDATE lessons SET status = 'ended', ended_at = ? WHERE id = ? AND status = 'active'").bind(now(), id).run();
+  // One transaction: copy the class's groups as they are now (the teacher may have grouped
+  // mid-lesson), then end it. Both only happen while the lesson is still active.
+  const [, res] = await db.batch([
+    db
+      .prepare(
+        `INSERT INTO lesson_groups (lesson_id, grouping_id, grouping_name, grouping_created_at, group_name, group_position, student_id)
+         SELECT l.id, g.id, g.name, g.created_at, gr.name, gr.position, m.student_id
+         FROM lessons l JOIN groupings g ON g.class_id = l.class_id
+           JOIN groups gr ON gr.grouping_id = g.id JOIN group_members m ON m.group_id = gr.id
+         WHERE l.id = ? AND l.status = 'active'`,
+      )
+      .bind(id),
+    db.prepare("UPDATE lessons SET status = 'ended', ended_at = ?, groups_saved = 1 WHERE id = ? AND status = 'active'").bind(now(), id),
+  ]);
   if (!res.meta.changes) {
     const exists = await db.prepare("SELECT 1 FROM lessons WHERE id = ?").bind(id).first();
     return exists ? c.json({ ok: true }) : fail(c, LESSON_GONE, 404);

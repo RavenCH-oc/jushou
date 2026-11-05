@@ -10,6 +10,7 @@ import { GroupingPage, NewGrouping, Projection } from "./grouping";
 import { SetPage, SetPreview } from "./question-set";
 import { QuestionEditor } from "./question-editor";
 import { LessonPage, StartLesson } from "./lesson";
+import { RecordPage, StudentPage } from "./records";
 
 type View = "loading" | "login" | "app" | "offline";
 
@@ -53,6 +54,10 @@ function Routes({ onLogout }: { onLogout: () => void }) {
   if ((m = match("/new", path))) return <NewClass />;
   if ((m = match("/start/:classId?", path))) return <StartLesson classId={m.classId} />;
   if ((m = match("/lesson/:id", path))) return <LessonPage key={m.id} id={m.id} />;
+  // Same component for the record's tabs and questions, so the record loads once.
+  if ((m = match("/record/:id/q/:qid", path))) return <RecordPage key={m.id} id={m.id} qid={m.qid} />;
+  if ((m = match("/record/:id/:tab?", path))) return <RecordPage key={m.id} id={m.id} tab={m.tab} />;
+  if ((m = match("/student/:id", path))) return <StudentPage id={m.id} />;
   if ((m = match("/class/:id/new-grouping", path))) return <NewGrouping classId={m.id} />;
   if ((m = match("/class/:id/:tab?", path))) return <ClassPage id={m.id} tab={m.tab} />;
   if ((m = match("/grouping/:id/show", path))) return <Projection id={m.id} />;

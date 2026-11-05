@@ -7,8 +7,8 @@ import { Confirm, ErrorText, Loading, Modal, useAction, useLoad } from "./ui";
 import { OfflineNote, useLive } from "../student/live";
 import { QuestionText, QuestionView } from "../student/question-view";
 import { toStudentView } from "../shared/grading";
-import { optionLetter, typeLabel } from "../shared/questions";
-import type { ActiveLesson, EssayAnswer, LessonDetail, LessonQuestion } from "../shared/lesson";
+import { optionLetter, typeLabel, type Question } from "../shared/questions";
+import type { ActiveLesson, EssayAnswer, LessonDetail, LessonQuestion, QuestionStats } from "../shared/lesson";
 import type { ClassSummary, QuestionSetSummary } from "../shared/types";
 
 // --- Start a lesson ---
@@ -150,7 +150,10 @@ export function LessonPage({ id }: { id: string }) {
         <p>
           {lesson.className}・{lesson.setName}
         </p>
-        <a class="btn btn-block" href={href("/")}>
+        <a class="btn btn-block" href={href(`/record/${lesson.id}`)}>
+          看這堂課的紀錄
+        </a>
+        <a class="btn btn-secondary btn-block" href={href("/")}>
           回首頁
         </a>
       </main>
@@ -436,7 +439,7 @@ function Bar({ label, n, of, correct }: { label: string; n: number; of: number; 
 
 // Answer distribution after 停止作答; correct answers only marked once revealed.
 function Results({ q, revealed, onEssays }: { q: LessonQuestion; revealed: boolean; onEssays: () => void }) {
-  const { answered, correct, choices = [], blanks = [] } = q.stats;
+  const { answered, correct } = q.stats;
   if (q.type === "essay") {
     return (
       <div class="results">
@@ -454,20 +457,28 @@ function Results({ q, revealed, onEssays }: { q: LessonQuestion; revealed: boole
           答對 {correct} 人，正確率 {percent(correct, answered)}%
         </p>
       )}
-      <ul class="bars">
-        {q.type === "truefalse" &&
-          ["○ 對", "✕ 錯"].map((label, i) => (
-            <Bar key={label} label={label} n={choices[i] ?? 0} of={answered} correct={revealed && q.config.answer === (i === 0)} />
-          ))}
-        {(q.type === "single" || q.type === "multiple") &&
-          q.config.options.map((text, i) => (
-            <Bar key={i} label={`${optionLetter(i)}．${text}`} n={choices[i] ?? 0} of={answered} correct={revealed && q.config.correct.includes(i)} />
-          ))}
-        {q.type === "fill" &&
-          q.config.blanks.map((accepted, i) => (
-            <Bar key={i} label={`第 ${i + 1} 格答對${revealed ? `（${accepted.join("、")}）` : ""}`} n={blanks[i] ?? 0} of={answered} />
-          ))}
-      </ul>
+      <AnswerBars q={q} stats={q.stats} revealed={revealed} />
     </div>
+  );
+}
+
+// One bar per option (or per blank); also used on the 上課紀錄 question page.
+export function AnswerBars({ q, stats, revealed }: { q: Question; stats: QuestionStats; revealed: boolean }) {
+  const { answered, choices = [], blanks = [] } = stats;
+  return (
+    <ul class="bars">
+      {q.type === "truefalse" &&
+        ["○ 對", "✕ 錯"].map((label, i) => (
+          <Bar key={label} label={label} n={choices[i] ?? 0} of={answered} correct={revealed && q.config.answer === (i === 0)} />
+        ))}
+      {(q.type === "single" || q.type === "multiple") &&
+        q.config.options.map((text, i) => (
+          <Bar key={i} label={`${optionLetter(i)}．${text}`} n={choices[i] ?? 0} of={answered} correct={revealed && q.config.correct.includes(i)} />
+        ))}
+      {q.type === "fill" &&
+        q.config.blanks.map((accepted, i) => (
+          <Bar key={i} label={`第 ${i + 1} 格答對${revealed ? `（${accepted.join("、")}）` : ""}`} n={blanks[i] ?? 0} of={answered} />
+        ))}
+    </ul>
   );
 }

@@ -11,6 +11,7 @@
     "deploy": "pnpm build && wrangler d1 migrations apply jushou-db --remote && wrangler deploy"
   },
   "dependencies": {
+    "fflate": "0.8.2",
     "hono": "^4.13.16",
     "preact": "^11.1.1",
     "uqr": "0.1.3"

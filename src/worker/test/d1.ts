@@ -11,12 +11,16 @@ type Value = string | number | null;
 class Statement {
   constructor(
     private db: DatabaseSync,
-    private sql: string,
+    readonly sql: string,
     private params: Value[] = [],
   ) {}
 
   bind(...params: unknown[]) {
-    return new Statement(this.db, this.sql, params.map((p) => (p === undefined ? null : (p as Value))));
+    return new Statement(
+      this.db,
+      this.sql,
+      params.map((p) => (p === undefined ? null : (p as Value))),
+    );
   }
 
   async all<T>() {
@@ -47,7 +51,12 @@ export function createTestDb() {
     async batch(stmts: Statement[]) {
       db.exec("BEGIN");
       try {
-        const out = stmts.map((s) => ({ results: s.exec(), success: true, meta: {} }));
+        // Like D1, each result carries how many rows that statement changed.
+        const changes = () => Number((db.prepare("SELECT changes() AS n").get() as { n: number }).n);
+        const out = stmts.map((s) => {
+          const results = s.exec();
+          return { results, success: true, meta: /^\s*(INSERT|UPDATE|DELETE)/i.test(s.sql) ? { changes: changes() } : {} };
+        });
         db.exec("COMMIT");
         return out;
       } catch (e) {

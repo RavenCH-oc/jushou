@@ -208,6 +208,7 @@ const RESULT_LABEL = {
   wrong: "✕ 答錯",
   unanswered: "沒作答",
   pending: "老師之後批改",
+  graded: "老師已批改",
   hidden: "老師沒有公布答案",
 };
 
@@ -230,7 +231,7 @@ function LessonResultView({ result, onLeave }: { result: LessonResult; onLeave: 
             </span>
             <span class="result-mark">
               {RESULT_LABEL[item.result]}
-              {item.result === "correct" && `（${item.score} 分）`}
+              {(item.result === "correct" || item.result === "graded") && `（${item.score} 分）`}
             </span>
           </li>
         ))}

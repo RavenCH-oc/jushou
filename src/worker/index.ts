@@ -5,6 +5,7 @@ import classes from "./classes";
 import groupings from "./groupings";
 import questionSets from "./question-sets";
 import lessons from "./lessons";
+import records from "./records";
 import student from "./student";
 import { connect } from "./lesson-hub";
 import { fail } from "./util";
@@ -52,6 +53,7 @@ app.route("/api/teacher", classes);
 app.route("/api/teacher", groupings);
 app.route("/api/teacher", questionSets);
 app.route("/api/teacher", lessons);
+app.route("/api/teacher", records);
 
 app.notFound((c) => c.json({ error: "找不到這個功能。" }, 404));
 
