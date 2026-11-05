@@ -3,12 +3,14 @@ import { api } from "./api";
 import { href } from "./router";
 import { Confirm, ErrorText, Loading, useAction, useLoad } from "./ui";
 import { Roster } from "./roster";
+import { RecordList } from "./records";
 import { MAX_CLASS_NAME } from "../shared/limits";
 import type { ClassDetail } from "../shared/types";
 
 const TABS = [
   { key: "", label: "學生名冊" },
   { key: "groups", label: "分組" },
+  { key: "records", label: "上課紀錄" },
   { key: "settings", label: "班級設定" },
 ];
 
@@ -46,6 +48,8 @@ export function ClassPage({ id, tab }: { id: string; tab: string }) {
       </nav>
       {tab === "groups" ? (
         <Groupings cls={cls} />
+      ) : tab === "records" ? (
+        <RecordList cls={cls} />
       ) : tab === "settings" ? (
         <Settings cls={cls} reload={reload} />
       ) : (

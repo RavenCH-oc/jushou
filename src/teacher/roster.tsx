@@ -1,5 +1,6 @@
 import { useState } from "preact/hooks";
 import { api } from "./api";
+import { href } from "./router";
 import { Confirm, ErrorText, Modal, useAction } from "./ui";
 import { parseRoster, type RosterRow } from "../shared/roster";
 import { MAX_SEAT, MAX_STUDENT_NAME } from "../shared/limits";
@@ -171,7 +172,11 @@ function StudentTable({ cls, reload }: { cls: ClassDetail; reload: () => void })
             ) : (
               <tr key={s.id}>
                 <td>{s.seat}</td>
-                <td>{s.name}</td>
+                <td>
+                  <a href={href(`/student/${s.id}`)} title="看這位學生的歷次表現">
+                    {s.name}
+                  </a>
+                </td>
                 <td class="actions">
                   <button class="btn btn-secondary btn-small" onClick={() => setEditing(s.id)}>
                     修改

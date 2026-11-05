@@ -6,6 +6,8 @@ import { MAX_CLASS_NAME } from "../shared/limits";
 import { MAX_SET_NAME } from "../shared/questions";
 import type { ClassSummary, QuestionSetSummary } from "../shared/types";
 import type { ActiveLesson } from "../shared/lesson";
+import type { LessonSummary } from "../shared/records";
+import { RecentRecords } from "./records";
 
 export function Home({ onLogout }: { onLogout: () => void }) {
   const { data, error } = useLoad(
@@ -14,6 +16,7 @@ export function Home({ onLogout }: { onLogout: () => void }) {
         api<ClassSummary[]>("GET", "/classes"),
         api<QuestionSetSummary[]>("GET", "/sets"),
         api<ActiveLesson | null>("GET", "/lessons/active"),
+        api<LessonSummary[]>("GET", "/records/recent"),
       ]),
     [],
   );
@@ -24,7 +27,7 @@ export function Home({ onLogout }: { onLogout: () => void }) {
   };
 
   if (!data) return <Loading error={error} />;
-  const [classes, sets, active] = data;
+  const [classes, sets, active, recent] = data;
   return (
     <main class="page">
       <header class="topbar">
@@ -68,6 +71,7 @@ export function Home({ onLogout }: { onLogout: () => void }) {
           </ul>
         )}
       </section>
+      <RecentRecords list={recent} />
       <section class="home-section">
         <div class="section-head">
           <h2>題組</h2>

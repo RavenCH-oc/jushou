@@ -9,6 +9,7 @@ const VERDICT = {
   wrong: ["✕", "答錯了"],
   unanswered: ["－", "沒有作答"],
   pending: ["…", "老師之後批改"],
+  graded: ["✓", "老師已批改"],
 } as const;
 
 export function Reveal({ current }: { current: StudentCurrent }) {
