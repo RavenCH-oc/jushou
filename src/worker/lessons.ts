@@ -3,7 +3,16 @@
 import { Hono } from "hono";
 import type { AppEnv } from "./env";
 import type { Question } from "../shared/questions";
-import type { ActiveLesson, EssayAnswer, LessonDetail, LessonQuestion, QuestionStats, QuestionStatus } from "../shared/lesson";
+import type {
+  ActiveLesson,
+  EssayAnswer,
+  LessonDetail,
+  LessonQuestion,
+  PeerReviewItem,
+  QuestionStats,
+  QuestionStatus,
+} from "../shared/lesson";
+import { assignReviews } from "../shared/peer-review";
 import { notify } from "./lesson-hub";
 import { fail, now, readBody } from "./util";
 
@@ -117,7 +126,7 @@ app.get("/lessons/:id", async (c) => {
     }>();
   if (!lesson) return fail(c, LESSON_GONE, 404);
 
-  const [students, joined, questions, answers] = await Promise.all([
+  const [students, joined, questions, answers, reviews] = await Promise.all([
     db
       .prepare("SELECT id, seat, name, device_hash IS NOT NULL AS bound FROM students WHERE class_id = ? ORDER BY seat")
       .bind(lesson.class_id)
@@ -131,6 +140,13 @@ app.get("/lessons/:id", async (c) => {
       )
       .bind(lesson.id)
       .all<AnswerRow>(),
+    db
+      .prepare(
+        `SELECT r.lesson_question_id AS qid, COUNT(*) AS total, COUNT(r.submitted_at) AS done
+         FROM peer_reviews r JOIN lesson_questions q ON q.id = r.lesson_question_id WHERE q.lesson_id = ? GROUP BY r.lesson_question_id`,
+      )
+      .bind(lesson.id)
+      .all<{ qid: string; total: number; done: number }>(),
   ]);
   const joinedIds = new Set(joined.results.map((r) => r.student_id));
 
@@ -146,38 +162,138 @@ app.get("/lessons/:id", async (c) => {
     questions: questions.results.map((row): LessonQuestion => {
       const q = toQuestion(row);
       const rows = answers.results.filter((a) => a.qid === row.id);
-      return { ...q, status: row.status, answeredBy: rows.map((r) => r.student_id), stats: stats(q, rows) };
+      const review = reviews.results.find((r) => r.qid === row.id);
+      return {
+        ...q,
+        status: row.status,
+        answeredBy: rows.map((r) => r.student_id),
+        stats: stats(q, rows),
+        ...(review ? { review: { done: review.done, total: review.total } } : {}),
+      };
     }),
   };
   return c.json(detail);
 });
 
-// pending → open → closed → revealed. Opening a question closes any other open one.
-const STEPS = { open: ["pending", "open"], close: ["open", "closed"], reveal: ["closed", "revealed"] } as const;
+// pending → open → closed → (reviewing →) revealed; see QuestionStatus.
+// reveal also ends 互評 (結束互評). Opening a question stops whatever the students
+// were on: an open one becomes closed, one being reviewed becomes revealed.
+const STEPS: Record<string, { from: QuestionStatus[]; to: QuestionStatus }> = {
+  open: { from: ["pending"], to: "open" },
+  close: { from: ["open"], to: "closed" },
+  reveal: { from: ["closed", "reviewing"], to: "revealed" },
+};
+const CHANGED = "這一題的狀態已經變了，畫面會自動更新。";
 
-app.post("/lesson-questions/:id/:step", async (c) => {
-  const step = c.req.param("step") as keyof typeof STEPS;
-  if (!(step in STEPS)) return fail(c, "找不到這個功能。", 404);
-  const [from, to] = STEPS[step];
-  const db = c.env.DB;
-  const row = await db
+function findQuestion(db: D1Database, id: string) {
+  return db
     .prepare(
-      "SELECT q.id, q.status, q.lesson_id, l.status AS lesson_status FROM lesson_questions q JOIN lessons l ON l.id = q.lesson_id WHERE q.id = ?",
+      `SELECT q.id, q.type, q.status, q.lesson_id, l.status AS lesson_status
+       FROM lesson_questions q JOIN lessons l ON l.id = q.lesson_id WHERE q.id = ?`,
     )
-    .bind(c.req.param("id"))
-    .first<{ id: string; status: QuestionStatus; lesson_id: string; lesson_status: string }>();
+    .bind(id)
+    .first<{ id: string; type: string; status: QuestionStatus; lesson_id: string; lesson_status: string }>();
+}
+
+// 開始互評: pair up everyone who answered this 簡答. Fixed from now on, whoever joins or leaves.
+app.post("/lesson-questions/:id/review", async (c) => {
+  const db = c.env.DB;
+  const row = await findQuestion(db, c.req.param("id"));
   if (!row) return fail(c, QUESTION_GONE, 404);
   if (row.lesson_status !== "active") return fail(c, LESSON_ENDED, 409);
-  if (row.status === to) return c.json({ ok: true }); // pressed twice
-  if (row.status !== from) return fail(c, "這一題的狀態已經變了，畫面會自動更新。", 409);
+  if (row.type !== "essay") return fail(c, "只有簡答題可以互評。");
+  if (row.status === "reviewing") return c.json({ ok: true }); // pressed twice
+  if (row.status !== "closed") return fail(c, CHANGED, 409);
+  const { results } = await db
+    .prepare("SELECT student_id FROM answers WHERE lesson_question_id = ?")
+    .bind(row.id)
+    .all<{ student_id: string }>();
+  const pairs = assignReviews(results.map((r) => r.student_id));
+  if (!pairs.length) return fail(c, "至少要 2 位同學作答才能互評。");
+  // Inserted only if the UPDATE before it, in the same transaction, started 互評.
+  const insert = db.prepare(
+    `INSERT INTO peer_reviews (lesson_question_id, reviewer_id, reviewee_id)
+     SELECT ?1, ?2, ?3 WHERE EXISTS (SELECT 1 FROM lesson_questions WHERE id = ?1 AND status = 'reviewing')`,
+  );
+  try {
+    await db.batch([
+      // Only from 已停止, so two presses at once can't both pair people up.
+      db.prepare("UPDATE lesson_questions SET status = 'reviewing' WHERE id = ? AND status = 'closed'").bind(row.id),
+      ...pairs.map((p) => insert.bind(row.id, p.reviewer, p.reviewee)),
+    ]);
+  } catch (e) {
+    if ((await findQuestion(db, row.id))?.status === "reviewing") return c.json({ ok: true });
+    throw e;
+  }
+  await notify(c.env, row.lesson_id, "question");
+  return c.json({ ok: true });
+});
 
-  const stmts = [db.prepare("UPDATE lesson_questions SET status = ? WHERE id = ?").bind(to, row.id)];
-  if (step === "open") {
-    stmts.unshift(db.prepare("UPDATE lesson_questions SET status = 'closed' WHERE lesson_id = ? AND status = 'open'").bind(row.lesson_id));
+app.post("/lesson-questions/:id/:step", async (c) => {
+  const step = STEPS[c.req.param("step")];
+  if (!step) return fail(c, "找不到這個功能。", 404);
+  const db = c.env.DB;
+  const row = await findQuestion(db, c.req.param("id"));
+  if (!row) return fail(c, QUESTION_GONE, 404);
+  if (row.lesson_status !== "active") return fail(c, LESSON_ENDED, 409);
+  if (row.status === step.to) return c.json({ ok: true }); // pressed twice
+  if (!step.from.includes(row.status)) return fail(c, CHANGED, 409);
+
+  const stmts = [db.prepare("UPDATE lesson_questions SET status = ? WHERE id = ?").bind(step.to, row.id)];
+  if (step.to === "open") {
+    stmts.unshift(
+      db.prepare("UPDATE lesson_questions SET status = 'closed' WHERE lesson_id = ? AND status = 'open'").bind(row.lesson_id),
+      db.prepare("UPDATE lesson_questions SET status = 'revealed' WHERE lesson_id = ? AND status = 'reviewing'").bind(row.lesson_id),
+    );
     stmts.push(db.prepare("UPDATE lessons SET current_question_id = ? WHERE id = ?").bind(row.id, row.lesson_id));
   }
   await db.batch(stmts);
   await notify(c.env, row.lesson_id, "question");
+  return c.json({ ok: true });
+});
+
+// 看評語: every pair with names, for the teacher only.
+app.get("/lesson-questions/:id/reviews", async (c) => {
+  const { results } = await c.env.DB.prepare(
+    `SELECT r.reviewer_id, a.seat AS a_seat, a.name AS a_name, b.seat AS b_seat, b.name AS b_name, r.score, r.comment, r.deleted
+     FROM peer_reviews r JOIN students a ON a.id = r.reviewer_id JOIN students b ON b.id = r.reviewee_id
+     WHERE r.lesson_question_id = ? ORDER BY a.seat`,
+  )
+    .bind(c.req.param("id"))
+    .all<{
+      reviewer_id: string;
+      a_seat: number;
+      a_name: string;
+      b_seat: number;
+      b_name: string;
+      score: number | null;
+      comment: string | null;
+      deleted: number;
+    }>();
+  const list: PeerReviewItem[] = results.map((r) => ({
+    reviewerId: r.reviewer_id,
+    reviewer: `${r.a_seat} 號 ${r.a_name}`,
+    reviewee: `${r.b_seat} 號 ${r.b_name}`,
+    score: r.score,
+    comment: r.comment,
+    deleted: !!r.deleted,
+  }));
+  return c.json(list);
+});
+
+// Removes an unkind comment; the student it was about sees 「這次沒有收到互評」.
+app.delete("/lesson-questions/:id/reviews/:reviewerId", async (c) => {
+  const db = c.env.DB;
+  const row = await findQuestion(db, c.req.param("id"));
+  if (!row) return fail(c, QUESTION_GONE, 404);
+  const res = await db
+    .prepare(
+      "UPDATE peer_reviews SET score = NULL, comment = NULL, deleted = 1 WHERE lesson_question_id = ? AND reviewer_id = ? AND score IS NOT NULL",
+    )
+    .bind(row.id, c.req.param("reviewerId"))
+    .run();
+  if (!res.meta.changes) return fail(c, "找不到這則評語，可能已經被刪除。", 404);
+  if (row.lesson_status === "active") await notify(c.env, row.lesson_id, "question");
   return c.json({ ok: true });
 });
 
@@ -213,7 +329,10 @@ app.post("/lessons/:id/end", async (c) => {
     const exists = await db.prepare("SELECT 1 FROM lessons WHERE id = ?").bind(id).first();
     return exists ? c.json({ ok: true }) : fail(c, LESSON_GONE, 404);
   }
-  await db.prepare("UPDATE lesson_questions SET status = 'closed' WHERE lesson_id = ? AND status = 'open'").bind(id).run();
+  await db.batch([
+    db.prepare("UPDATE lesson_questions SET status = 'closed' WHERE lesson_id = ? AND status = 'open'").bind(id),
+    db.prepare("UPDATE lesson_questions SET status = 'revealed' WHERE lesson_id = ? AND status = 'reviewing'").bind(id),
+  ]);
   await notify(c.env, id, "ended");
   return c.json({ ok: true });
 });

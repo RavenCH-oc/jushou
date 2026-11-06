@@ -23,6 +23,7 @@ import {
   percent,
   questionSnippet,
   ratio,
+  reviewsOf,
   summaryRate,
   typeLabel,
   type Analysis,
@@ -30,6 +31,7 @@ import {
   type LessonSummary,
   type RecordDetail,
   type RecordQuestion,
+  type RecordReview,
   type StudentHistory,
 } from "../shared/records";
 import type { ClassDetail, GroupingDetail } from "../shared/types";
@@ -266,7 +268,7 @@ export function RecordPage({ id, tab, qid }: { id: string; tab?: string; qid?: s
             ))}
           </nav>
           {tab === "questions" ? (
-            <QuestionTable id={id} a={a} />
+            <QuestionTable record={record} a={a} />
           ) : tab === "groups" && record.groupingCount > 0 ? (
             <GroupView record={record} a={a} />
           ) : (
@@ -351,7 +353,8 @@ function ScoreTable({ a }: { a: Analysis }) {
   );
 }
 
-function QuestionTable({ id, a }: { id: string; a: Analysis }) {
+function QuestionTable({ record, a }: { record: LessonRecord; a: Analysis }) {
+  const id = record.id;
   return (
     <div class="table-wrap">
       <table class="table records-table">
@@ -374,6 +377,9 @@ function QuestionTable({ id, a }: { id: string; a: Analysis }) {
               <td class="wrap">{questionSnippet(x.q.text)}</td>
               <td>
                 {x.q.type === "essay" ? `平均 ${oneDecimal(x.average)} 分` : percent(x.rate)}
+                {x.q.type === "essay" && reviewsOf(record, x.q.id).list.length > 0 && (
+                  <span class="muted">・互評平均 {oneDecimal(reviewsOf(record, x.q.id).average)} 分</span>
+                )}
                 {x.ungraded > 0 && <Ungraded n={x.ungraded} />}
               </td>
               <td>
@@ -518,7 +524,7 @@ function QuestionDetail(props: {
         )}
       </div>
       {q.type === "essay" ? (
-        <EssayGrader key={q.id} recordId={record.id} q={q} a={a} onGraded={props.onGraded} />
+        <EssayGrader key={q.id} record={record} q={q} a={a} onGraded={props.onGraded} />
       ) : (
         <>
           <p class="correct-rate">
@@ -630,12 +636,14 @@ function WhoAnswered({ a, q }: { a: Analysis; q: RecordQuestion }) {
 }
 
 function EssayGrader(props: {
-  recordId: string;
+  record: LessonRecord;
   q: RecordQuestion;
   a: Analysis;
   onGraded: (questionId: string, studentId: string, score: number) => void;
 }) {
   const { q, a } = props;
+  const reviews = reviewsOf(props.record, q.id);
+  const seatOf = (id: string) => a.students.find((s) => s.id === id)?.seat;
   // Students who wrote something; 沒作答 isn't graded.
   const items = a.students
     .filter((s) => s.present)
@@ -656,7 +664,7 @@ function EssayGrader(props: {
   const grade = (score: number) =>
     action.run(async () => {
       if (!current) return;
-      await api("POST", `/records/${props.recordId}/grade`, { questionId: q.id, studentId: current.s.id, score });
+      await api("POST", `/records/${props.record.id}/grade`, { questionId: q.id, studentId: current.s.id, score });
       props.onGraded(q.id, current.s.id, score);
       setTyped("");
       // Next ungraded student after this one (by seat), going round to the start.
@@ -705,6 +713,9 @@ function EssayGrader(props: {
             {current.ans.status === "graded" && <span class="grader-now">目前 {current.ans.score} 分</span>}
           </p>
           <p class="grader-text">{answerText(q, current.ans.answer)}</p>
+          {reviews.list.length > 0 && (
+            <PeerNote received={reviews.received(current.s.id)} given={reviews.given(current.s.id)} seatOf={seatOf} />
+          )}
           <p class="grader-label">給幾分？（滿分 {q.points} 分，按下就儲存）</p>
           {q.points <= 10 ? (
             <div class="score-buttons">
@@ -762,6 +773,18 @@ function EssayGrader(props: {
         ))}
       </ul>
     </section>
+  );
+}
+
+// 互評 under the answer being graded: faint, and clearly not part of the score.
+function PeerNote(props: { received?: RecordReview; given?: RecordReview; seatOf: (id: string) => number | undefined }) {
+  const { received, given } = props;
+  return (
+    <div class="peer-note">
+      <p>同學互評，僅供參考</p>
+      <p>收到的互評：{received ? `${received.score} 分・${received.comment}` : "沒有"}</p>
+      <p>他評了誰：{given ? `${props.seatOf(given.revieweeId) ?? "?"} 號・${given.score} 分・${given.comment}` : "沒有"}</p>
+    </div>
   );
 }
 

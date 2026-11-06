@@ -4,7 +4,7 @@
 // Rules (出席, 有出的題目, 滿分, 總分): src/shared/records.ts.
 import { Hono } from "hono";
 import type { AppEnv } from "./env";
-import type { LessonSummary, RecordAnswerRow, RecordDetail, RecordGrouping, StudentHistory } from "../shared/records";
+import type { LessonSummary, RecordAnswerRow, RecordDetail, RecordGrouping, RecordReview, StudentHistory } from "../shared/records";
 import { toQuestion, type LessonQuestionRow } from "./lessons";
 import { fail, readBody } from "./util";
 
@@ -61,7 +61,7 @@ app.get("/records/:id", async (c) => {
     .bind(c.req.param("id"))
     .first<{ id: string; class_id: string; set_name: string; started_at: string; groups_saved: number; name: string; groupings: number }>();
   if (!lesson) return fail(c, RECORD_GONE, 404);
-  const [students, questions, answers, groups] = await Promise.all([
+  const [students, questions, answers, groups, reviews] = await Promise.all([
     db
       .prepare(`SELECT s.id, s.seat, s.name, ${attended("?1", "s.id")} AS present FROM students s WHERE s.class_id = ?2 ORDER BY s.seat`)
       .bind(lesson.id, lesson.class_id)
@@ -81,6 +81,15 @@ app.get("/records/:id", async (c) => {
       )
       .bind(lesson.id)
       .all<{ grouping_id: string; grouping_name: string; group_name: string; group_position: number; student_id: string }>(),
+    // 互評 that were sent and not deleted. For reference only; never part of a score.
+    db
+      .prepare(
+        `SELECT r.lesson_question_id AS questionId, r.reviewer_id AS reviewerId, r.reviewee_id AS revieweeId, r.score, r.comment
+         FROM peer_reviews r JOIN lesson_questions q ON q.id = r.lesson_question_id
+         WHERE q.lesson_id = ? AND r.score IS NOT NULL`,
+      )
+      .bind(lesson.id)
+      .all<RecordReview>(),
   ]);
   // Rows come sorted, so a new grouping or group starts whenever its id/position changes.
   let groupings: RecordGrouping[] | null = null;
@@ -109,6 +118,7 @@ app.get("/records/:id", async (c) => {
     students: students.results.map((s) => ({ ...s, present: !!s.present })),
     questions: questions.results.map((q) => ({ ...toQuestion(q), status: q.status })),
     answers: answers.results,
+    reviews: reviews.results,
   };
   return c.json(detail);
 });

@@ -280,6 +280,7 @@ a.btn { text-decoration: none; }
 .status-open { color: #1b6e2a; font-weight: 700; }
 .status-closed { color: #b26a00; font-weight: 700; }
 .status-revealed { color: var(--primary); }
+.status-reviewing { color: #7a3fb0; font-weight: 700; }
 .lesson-main { display: grid; gap: var(--space-2); }
 .lesson-main > p { margin: 0; }
 .lesson-meta { color: var(--text-muted); font-size: clamp(20px, 1.3vw, 28px); }
@@ -291,7 +292,11 @@ a.btn { text-decoration: none; }
 .projected .qv-options { gap: clamp(6px, 0.6vw, 12px); }
 .projected .qv-meta { display: none; }
 .lesson-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
-.lesson-foot .btn-main { margin-left: auto; min-width: min(100%, 360px); }
+.lesson-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--space-2); margin-left: auto; }
+.lesson-foot .btn-main { min-width: 360px; max-width: 100%; }
+.review-progress { font-size: clamp(32px, 3.2vw, 64px); font-weight: 700; }
+.review-progress strong { font-size: 1.4em; }
+.review-item { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-2); }
 .answered { margin: 0; font-size: clamp(24px, 2vw, 40px); }
 .answered strong { font-size: clamp(40px, 4vw, 80px); line-height: 1; }
 
@@ -416,3 +421,7 @@ a.btn { text-decoration: none; }
 .score-input { width: 8em; font-size: 28px; }
 .big-text { font-size: 26px; font-weight: 700; }
 .table a { color: var(--primary); }
+
+.peer-note { display: grid; gap: 2px; padding: var(--space-1) var(--space-2); color: var(--text-muted); font-size: var(--fs-small); border-left: 3px solid var(--border); }
+.peer-note p { margin: 0; overflow-wrap: anywhere; }
+.peer-note p:first-child { font-weight: 700; }

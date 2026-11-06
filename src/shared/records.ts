@@ -46,7 +46,11 @@ export type RecordDetail = {
   students: { id: string; seat: number; name: string; present: boolean }[];
   questions: RecordQuestion[]; // all of them, in order; see askedQuestions
   answers: RecordAnswerRow[];
+  reviews: RecordReview[]; // 互評 sent and not deleted
 };
+
+// One 互評: for the teacher's reference only, never counted in any score.
+export type RecordReview = { questionId: string; reviewerId: string; revieweeId: string; score: number; comment: string };
 
 export type RecordGrouping = { id: string; name: string; groups: { name: string; studentIds: string[] }[] };
 
@@ -63,7 +67,11 @@ export type LessonRecord = Omit<RecordDetail, "answers"> & { answers: RecordAnsw
 export function parseRecord(d: RecordDetail): LessonRecord {
   return {
     ...d,
-    answers: d.answers.map((a) => ({ ...a, answer: JSON.parse(a.answer) as Answer, blanks: a.blanks ? (JSON.parse(a.blanks) as boolean[]) : null })),
+    answers: d.answers.map((a) => ({
+      ...a,
+      answer: JSON.parse(a.answer) as Answer,
+      blanks: a.blanks ? (JSON.parse(a.blanks) as boolean[]) : null,
+    })),
   };
 }
 
@@ -145,6 +153,18 @@ export function analyze(r: LessonRecord) {
 
 export type Analysis = ReturnType<typeof analyze>;
 
+// 互評 of one question: who got what, who gave what, and the 互評平均.
+// Kept apart from analyze() on purpose: these scores never go into a total.
+export function reviewsOf(r: Pick<LessonRecord, "reviews">, questionId: string) {
+  const list = r.reviews.filter((x) => x.questionId === questionId);
+  return {
+    list,
+    received: (studentId: string) => list.find((x) => x.revieweeId === studentId),
+    given: (studentId: string) => list.find((x) => x.reviewerId === studentId),
+    average: average(list.map((x) => x.score)),
+  };
+}
+
 export function ratio(n: number, of: number) {
   return of ? n / of : null;
 }
@@ -213,7 +233,12 @@ export function answerText(q: Question, answer: Answer | null | undefined): stri
     case "single":
       return typeof answer === "number" ? optionLetter(answer) : "";
     case "multiple":
-      return Array.isArray(answer) ? [...(answer as number[])].sort((a, b) => a - b).map(optionLetter).join("、") : "";
+      return Array.isArray(answer)
+        ? [...(answer as number[])]
+            .sort((a, b) => a - b)
+            .map(optionLetter)
+            .join("、")
+        : "";
     case "fill":
       return Array.isArray(answer) ? (answer as string[]).map((s) => s.trim() || "（空白）").join("、") : "";
     case "essay":

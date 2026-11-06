@@ -1,16 +1,7 @@
 // Excel export, built in the browser from the same analysis the pages show.
 // Imported with import() when the teacher presses a 下載 button.
 import { buildXlsx, download, fileName, type CellValue, type Sheet } from "./xlsx";
-import {
-  analyze,
-  answerText,
-  dateStamp,
-  formatTaipei,
-  ratio,
-  RESULT_WORD,
-  typeLabel,
-  type LessonRecord,
-} from "../shared/records";
+import { analyze, answerText, dateStamp, formatTaipei, ratio, RESULT_WORD, typeLabel, type LessonRecord } from "../shared/records";
 
 const pct = (r: number | null) => (r === null ? null : Math.round(r * 1000) / 10); // 72.5 (%)
 const round1 = (n: number | null) => (n === null ? null : Math.round(n * 10) / 10);
@@ -44,11 +35,30 @@ export function lessonSheets(r: LessonRecord): Sheet[] {
       details.push([s.seat, s.name, i + 1, answerText(q, a.answerOf(q, s.id)?.answer), RESULT_WORD[c.kind], c.score]);
     });
   }
-  return [
+  const sheets: Sheet[] = [
     scoreSheet(r, "成績"),
     { name: "每題統計", rows: [["題號", "題型", "題目", "配分", "作答人數", "正確率(%)", "簡答平均分"], ...stats], widths: [6, 12, 50] },
     { name: "作答明細", rows: [["座號", "姓名", "題號", "作答內容", "結果", "得分"], ...details], widths: [6, 10, 6, 40] },
   ];
+  if (r.reviews.length) sheets.push(reviewSheet(r, a));
+  return sheets;
+}
+
+// 互評: only when the lesson had any. For reference; not in any score above.
+function reviewSheet(r: LessonRecord, a: ReturnType<typeof analyze>): Sheet {
+  const byId = new Map(r.students.map((s) => [s.id, s]));
+  const rows: CellValue[][] = [];
+  a.asked.forEach((q, i) => {
+    const list = r.reviews.filter((x) => x.questionId === q.id);
+    list.sort((x, y) => (byId.get(x.revieweeId)?.seat ?? 0) - (byId.get(y.revieweeId)?.seat ?? 0));
+    for (const x of list) {
+      const to = byId.get(x.revieweeId);
+      const from = byId.get(x.reviewerId);
+      rows.push([i + 1, to?.seat ?? null, to?.name ?? "", from?.seat ?? null, from?.name ?? "", x.score, x.comment]);
+    }
+  });
+  const head = ["題號", "被評者座號", "被評者姓名", "評分者座號", "評分者姓名", "分數", "評語"];
+  return { name: "互評", rows: [head, ...rows], widths: [6, 10, 10, 10, 10, 6, 50] };
 }
 
 // 總表 (one row per student, one column per lesson, oldest first) + each lesson's 成績.
@@ -84,4 +94,3 @@ export function downloadLesson(r: LessonRecord) {
 export function downloadClass(className: string, records: LessonRecord[]) {
   download(buildXlsx(classSheets(records)), fileName([className, "成績", dateStamp(new Date().toISOString())]));
 }
-

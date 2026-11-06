@@ -3,6 +3,7 @@
 import type { Answer } from "../shared/grading";
 import type { StudentCurrent } from "../shared/lesson";
 import { optionLetter, type Question } from "../shared/questions";
+import { ReceivedReview } from "./peer-review";
 
 const VERDICT = {
   correct: ["○", "答對了"],
@@ -17,6 +18,7 @@ export function Reveal({ current }: { current: StudentCurrent }) {
   const [mark, label] = VERDICT[result.status];
   return (
     <div class="stack">
+      {current.received !== undefined && <ReceivedReview received={current.received} />}
       <p class={`verdict verdict-${result.status}`} role="status">
         <span class="verdict-mark" aria-hidden="true">
           {mark}
