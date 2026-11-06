@@ -7,6 +7,7 @@ import { OfflineNote, useLive } from "./live";
 import { QuestionView } from "./question-view";
 import { readJoinLink } from "./join-link";
 import { Reveal } from "./reveal";
+import { Reviewing } from "./peer-review";
 import type { Answer } from "../shared/grading";
 import type { LessonResult, StudentCurrent, StudentState } from "../shared/lesson";
 
@@ -108,7 +109,8 @@ function Classroom({ code, onLeave }: { code: string; onLeave: (message?: string
       setError("");
     } catch (e) {
       if (ticket !== latest.current) return;
-      if ((e as ApiError).status === 404) onLeave((e as Error).message); // the teacher changed the code
+      if ((e as ApiError).status === 404)
+        onLeave((e as Error).message); // the teacher changed the code
       else setError((e as Error).message);
     }
   }, [code]);
@@ -169,6 +171,8 @@ function Classroom({ code, onLeave }: { code: string; onLeave: (message?: string
           <Answering key={current.question.id} code={code} current={current} onRefresh={refresh} />
         ) : current.status === "closed" ? (
           <Stopped current={current} />
+        ) : current.status === "reviewing" ? (
+          <Reviewing key={current.question.id} code={code} current={current} onRefresh={refresh} />
         ) : (
           <Reveal current={current} />
         )}

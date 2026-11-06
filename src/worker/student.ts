@@ -5,6 +5,7 @@ import { Hono, type Context } from "hono";
 import type { AppEnv } from "./env";
 import { gradeAnswer, toStudentView, type GradeResult } from "../shared/grading";
 import type { LessonResult, StudentCurrent, StudentState } from "../shared/lesson";
+import { checkReview } from "../shared/peer-review";
 import { notify } from "./lesson-hub";
 import { toQuestion, type LessonQuestionRow } from "./lessons";
 import { fail, now, readBody } from "./util";
@@ -71,7 +72,33 @@ async function current(db: D1Database, lessonId: string, questionId: string, me:
       : gradeAnswer(question, null);
     out.reveal = { result, question };
   }
+  if (row.type === "essay" && (row.status === "reviewing" || row.status === "revealed")) await addPeerReview(db, row, me, out);
   return out;
+}
+
+// 互評 parts of the screen. Who wrote what is never sent: the reviewer gets only the
+// answer text, the reviewee only the score and comment.
+async function addPeerReview(db: D1Database, row: LessonQuestionRow, me: Me, out: StudentCurrent) {
+  if (row.status === "reviewing") {
+    const task = await db
+      .prepare(
+        `SELECT a.answer, r.score, r.comment, r.deleted FROM peer_reviews r
+         JOIN answers a ON a.lesson_question_id = r.lesson_question_id AND a.student_id = r.reviewee_id
+         WHERE r.lesson_question_id = ? AND r.reviewer_id = ?`,
+      )
+      .bind(row.id, me.id)
+      .first<{ answer: string; score: number | null; comment: string | null; deleted: number }>();
+    out.review = task
+      ? { text: String(JSON.parse(task.answer)), score: task.score, comment: task.comment ?? "", deleted: !!task.deleted }
+      : null;
+    return;
+  }
+  // Only students who were part of 互評 (answered before it started) get this part.
+  const got = await db
+    .prepare("SELECT score, comment FROM peer_reviews WHERE lesson_question_id = ? AND reviewee_id = ?")
+    .bind(row.id, me.id)
+    .first<{ score: number | null; comment: string | null }>();
+  if (got) out.received = got.score !== null ? { score: got.score, comment: got.comment ?? "" } : null;
 }
 
 // Midnight in Taiwan (UTC+8, no daylight saving), as the ISO string lessons store.
@@ -118,7 +145,12 @@ app.get("/state/:code", async (c) => {
   const cls = await findClass(db, c.req.param("code"));
   if (!cls) return fail(c, NO_CODE, 404);
   const [me, lesson] = await Promise.all([findMe(db, cls.id, await deviceHash(c)), findLesson(db, cls.id)]);
-  const state: StudentState = { className: cls.name, lessonId: lesson?.id ?? null, me: me && { seat: me.seat, name: me.name }, current: null };
+  const state: StudentState = {
+    className: cls.name,
+    lessonId: lesson?.id ?? null,
+    me: me && { seat: me.seat, name: me.name },
+    current: null,
+  };
 
   if (!me) {
     const { results } = await db
@@ -183,6 +215,41 @@ app.post("/unbind/:code", async (c) => {
     ...(lesson ? [db.prepare("DELETE FROM lesson_students WHERE lesson_id = ? AND student_id = ?").bind(lesson.id, me.id)] : []),
   ]);
   if (lesson) await notify(c.env, lesson.id, "roster", "teacher");
+  return c.json({ ok: true });
+});
+
+// Body: { questionId, score, comment }. Only while 互評中, only the one answer this
+// student was given; sending again replaces it.
+app.post("/review/:code", async (c) => {
+  const db = c.env.DB;
+  const cls = await findClass(db, c.req.param("code"));
+  if (!cls) return fail(c, NO_CODE, 404);
+  const me = await findMe(db, cls.id, await deviceHash(c));
+  if (!me) return fail(c, NOT_ME, 403);
+  const lesson = await findLesson(db, cls.id);
+  if (!lesson) return fail(c, "這堂課已經結束了。", 409);
+
+  const { questionId, score, comment } = await readBody(c);
+  const row = await db
+    .prepare("SELECT id, status FROM lesson_questions WHERE id = ? AND lesson_id = ?")
+    .bind(questionId, lesson.id)
+    .first<{ id: string; status: string }>();
+  if (!row) return fail(c, "找不到這一題，請重新整理。", 404);
+  if (row.status !== "reviewing") return fail(c, "老師已經結束互評了。", 409);
+  const task = await db
+    .prepare("SELECT deleted FROM peer_reviews WHERE lesson_question_id = ? AND reviewer_id = ?")
+    .bind(row.id, me.id)
+    .first<{ deleted: number }>();
+  if (!task) return fail(c, "這題沒有分配給你評，等老師下一步。", 403);
+  if (task.deleted) return fail(c, "老師已經刪除你這則評語，不能再送出。", 409);
+  const problem = checkReview(score, comment);
+  if (problem) return fail(c, problem);
+
+  await db
+    .prepare("UPDATE peer_reviews SET score = ?, comment = ?, submitted_at = ? WHERE lesson_question_id = ? AND reviewer_id = ?")
+    .bind(score, (comment as string).trim(), now(), row.id, me.id)
+    .run();
+  await notify(c.env, lesson.id, "answers", "teacher");
   return c.json({ ok: true });
 });
 

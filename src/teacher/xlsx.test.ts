@@ -31,7 +31,16 @@ describe("sheet names", () => {
 
 describe("xlsx file", () => {
   it("stores numbers as numbers, text inline, header frozen", () => {
-    const bytes = buildXlsx([{ name: "成績", rows: [["座號", "姓名"], [1, "王<小>明&"], [2, null]] }]);
+    const bytes = buildXlsx([
+      {
+        name: "成績",
+        rows: [
+          ["座號", "姓名"],
+          [1, "王<小>明&"],
+          [2, null],
+        ],
+      },
+    ]);
     const files = unzipSync(bytes);
     expect(Object.keys(files).sort()).toEqual([
       "[Content_Types].xml",
@@ -58,6 +67,7 @@ const record: LessonRecord = {
   startedAt: "2026-11-05T02:10:00.000Z",
   groupingCount: 0,
   groupings: [],
+  reviews: [],
   students: [
     { id: "A", seat: 1, name: "甲", present: true },
     { id: "B", seat: 2, name: "乙", present: false },
@@ -95,8 +105,35 @@ describe("export sheets", () => {
     ]);
   });
 
+  it("no 互評 sheet without 互評; with it, one row per review and scores unchanged", () => {
+    expect(lessonSheets(record).map((x) => x.name)).toEqual(["成績", "每題統計", "作答明細"]);
+    const students = [...record.students, { id: "C", seat: 3, name: "丙", present: true }];
+    const reviewed = {
+      ...record,
+      students,
+      reviews: [
+        { questionId: "e", reviewerId: "C", revieweeId: "A", score: 4, comment: "寫得好" },
+        { questionId: "e", reviewerId: "A", revieweeId: "C", score: 2, comment: "太短" },
+      ],
+    };
+    const sheets = lessonSheets(reviewed);
+    expect(sheets.map((x) => x.name)).toEqual(["成績", "每題統計", "作答明細", "互評"]);
+    expect(sheets[3].rows).toEqual([
+      ["題號", "被評者座號", "被評者姓名", "評分者座號", "評分者姓名", "分數", "評語"],
+      [3, 1, "甲", 3, "丙", 4, "寫得好"],
+      [3, 3, "丙", 1, "甲", 2, "太短"],
+    ]);
+    expect(sheets[0].rows).toEqual(lessonSheets({ ...reviewed, reviews: [] })[0].rows); // 成績 doesn't change
+  });
+
   it("whole class: 總表 oldest first, absent left empty", () => {
-    const later = { ...record, id: "L2", setName: "師說", startedAt: "2026-11-12T02:10:00.000Z", students: record.students.map((s) => ({ ...s, present: true })) };
+    const later = {
+      ...record,
+      id: "L2",
+      setName: "師說",
+      startedAt: "2026-11-12T02:10:00.000Z",
+      students: record.students.map((s) => ({ ...s, present: true })),
+    };
     const [summary, first, second] = classSheets([later, record]);
     expect(summary.rows[0]).toEqual(["座號", "姓名", "11/5 出師表", "11/12 師說", "出席次數", "平均得分率(%)"]);
     expect(summary.rows[1]).toEqual([1, "甲", 7, 7, 2, 77.8]);

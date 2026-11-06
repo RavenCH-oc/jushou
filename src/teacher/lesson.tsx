@@ -8,7 +8,7 @@ import { OfflineNote, useLive } from "../student/live";
 import { QuestionText, QuestionView } from "../student/question-view";
 import { toStudentView } from "../shared/grading";
 import { optionLetter, typeLabel, type Question } from "../shared/questions";
-import type { ActiveLesson, EssayAnswer, LessonDetail, LessonQuestion, QuestionStats } from "../shared/lesson";
+import type { ActiveLesson, EssayAnswer, LessonDetail, LessonQuestion, PeerReviewItem, QuestionStats } from "../shared/lesson";
 import type { ClassSummary, QuestionSetSummary } from "../shared/types";
 
 // --- Start a lesson ---
@@ -101,7 +101,7 @@ export function StartLesson({ classId }: { classId: string }) {
 
 // --- The lesson screen ---
 
-const STATUS_LABEL = { pending: "未出題", open: "作答中", closed: "已停止作答", revealed: "已公布答案" };
+const STATUS_LABEL = { pending: "未出題", open: "作答中", closed: "已停止作答", reviewing: "互評中", revealed: "已公布答案" };
 
 type Dialog =
   | { kind: "join" }
@@ -109,7 +109,11 @@ type Dialog =
   | { kind: "end" }
   | { kind: "unbind"; id: string; label: string }
   | { kind: "essay-warn"; q: LessonQuestion }
-  | { kind: "essays"; list: EssayAnswer[] };
+  | { kind: "essays"; list: EssayAnswer[] }
+  | { kind: "end-review"; left: number; label: string; run: () => Promise<void> }
+  | { kind: "reviews-warn"; q: LessonQuestion }
+  | { kind: "reviews"; q: LessonQuestion; list: PeerReviewItem[] }
+  | { kind: "delete-review"; q: LessonQuestion; item: PeerReviewItem; list: PeerReviewItem[] };
 
 export function LessonPage({ id }: { id: string }) {
   const [lesson, setLesson] = useState<LessonDetail | null>(null);
@@ -161,24 +165,45 @@ export function LessonPage({ id }: { id: string }) {
   }
 
   const questions = lesson.questions;
-  const index = Math.max(0, questions.findIndex((q) => q.id === (focusId ?? currentId)));
+  const index = Math.max(
+    0,
+    questions.findIndex((q) => q.id === (focusId ?? currentId)),
+  );
   const q = questions[index];
   const joined = lesson.students.filter((s) => s.joined);
-  const step = (s: "open" | "close" | "reveal", target = q) =>
-    action.run(async () => {
-      await api("POST", `/lesson-questions/${target.id}/${s}`);
-      await load();
-    });
+  const call = async (s: "open" | "close" | "reveal" | "review", target = q) => {
+    await api("POST", `/lesson-questions/${target.id}/${s}`);
+    await load();
+  };
+  const step = (s: "open" | "close" | "reveal" | "review", target = q) => action.run(() => call(s, target));
+
+  // Moving on while 互評 is going ends it; ask first if someone hasn't sent theirs.
+  const reviewing = questions.find((x) => x.status === "reviewing");
+  const left = reviewing?.review ? reviewing.review.total - reviewing.review.done : 0;
+  const endingReview = (label: string, run: () => Promise<void>) => () =>
+    left > 0 ? setDialog({ kind: "end-review", left, label, run }) : action.run(run);
 
   const next = questions[index + 1];
-  let main;
-  if (q.status === "pending") main = { label: currentId ? "出這一題" : "出第 1 題", run: () => step("open") };
+  let main: { label: string; run: () => void; disabled?: boolean };
+  const extra: { label: string; run: () => void }[] = [];
+  let note = "";
+  if (q.status === "pending")
+    main = { label: currentId ? "出這一題" : "出第 1 題", run: endingReview("結束互評，出這一題", () => call("open")) };
   else if (q.status === "open") main = { label: "停止作答", run: () => step("close") };
-  else if (q.status === "closed") main = { label: "公布答案", run: () => step("reveal") };
+  else if (q.status === "closed" && q.type === "essay") {
+    main = { label: "開始互評", run: () => step("review"), disabled: q.stats.answered < 2 };
+    if (q.stats.answered < 2) note = "至少要 2 位同學作答才能互評。";
+    extra.push({ label: "跳過互評，直接公布", run: () => step("reveal") });
+  } else if (q.status === "closed") main = { label: "公布答案", run: () => step("reveal") };
+  else if (q.status === "reviewing") {
+    main = { label: "結束互評", run: endingReview("結束互評", () => call("reveal")) };
+    if (next?.status === "pending") extra.push({ label: "出下一題", run: endingReview("結束互評，出下一題", () => call("open", next)) });
+  }
   // After revealing, the next question goes straight to the students.
   else if (next?.status === "pending") main = { label: "出下一題", run: () => step("open", next) };
   else if (next) main = { label: "下一題", run: () => setFocusId(next.id) };
   else main = { label: "結束上課", run: () => setDialog({ kind: "end" }) };
+  const showReviews = () => setDialog({ kind: "reviews-warn", q });
 
   return (
     <main class="lesson">
@@ -239,18 +264,43 @@ export function LessonPage({ id }: { id: string }) {
               </div>
             )}
             {(q.status === "closed" || q.status === "revealed") && (
-              <Results q={q} revealed={q.status === "revealed"} onEssays={() => setDialog({ kind: "essay-warn", q })} />
+              <Results
+                q={q}
+                revealed={q.status === "revealed"}
+                onEssays={() => setDialog({ kind: "essay-warn", q })}
+                onReviews={showReviews}
+              />
+            )}
+            {q.status === "reviewing" && q.review && (
+              <div class="results">
+                <p class="review-progress">
+                  互評中，已完成 <strong>{q.review.done}</strong>／{q.review.total} 人
+                </p>
+                <div>
+                  <button class="btn btn-secondary" onClick={showReviews}>
+                    看評語
+                  </button>
+                </div>
+              </div>
             )}
             <ErrorText message={action.error} />
+            {note && <p class="muted">{note}</p>}
             <div class="lesson-foot">
-              {q.status !== "pending" && (
+              {q.status !== "pending" && q.status !== "reviewing" && (
                 <p class="answered">
                   已作答 <strong>{q.stats.answered}</strong>／{joined.length} 人
                 </p>
               )}
-              <button class="btn btn-main" disabled={action.busy} onClick={main.run}>
-                {main.label}
-              </button>
+              <div class="lesson-actions">
+                {extra.map((x) => (
+                  <button key={x.label} class="btn btn-secondary" disabled={action.busy} onClick={x.run}>
+                    {x.label}
+                  </button>
+                ))}
+                <button class="btn btn-main" disabled={action.busy || main.disabled} onClick={main.run}>
+                  {main.label}
+                </button>
+              </div>
             </div>
           </section>
         </div>
@@ -339,6 +389,81 @@ export function LessonPage({ id }: { id: string }) {
           }}
           // Confirm closes itself after confirming; keep the list it just opened.
           onClose={() => setDialog((d) => (d?.kind === "essay-warn" ? null : d))}
+        />
+      )}
+      {dialog?.kind === "end-review" && (
+        <Confirm
+          title="結束互評？"
+          message={`還有 ${dialog.left} 人沒評完，結束後就不能再評。`}
+          confirmLabel={dialog.label}
+          onConfirm={dialog.run}
+          onClose={close}
+        />
+      )}
+      {dialog?.kind === "reviews-warn" && (
+        <Confirm
+          title="顯示全部評語？"
+          message="投影中會被學生看到，包括評分者和被評者的座號、姓名。"
+          confirmLabel="顯示評語"
+          onConfirm={async () => {
+            const list = await api<PeerReviewItem[]>("GET", `/lesson-questions/${dialog.q.id}/reviews`);
+            setDialog({ kind: "reviews", q: dialog.q, list });
+          }}
+          onClose={() => setDialog((d) => (d?.kind === "reviews-warn" ? null : d))}
+        />
+      )}
+      {dialog?.kind === "reviews" && (
+        <Modal
+          wide
+          title={`評語（已完成 ${dialog.list.filter((r) => r.score !== null || r.deleted).length}／${dialog.list.length} 人）`}
+          onClose={close}
+        >
+          <ul class="essay-list">
+            {dialog.list.map((r) => (
+              <li key={r.reviewerId} class="review-item">
+                <div>
+                  <strong>
+                    {r.reviewer} → {r.reviewee}
+                  </strong>
+                  {r.deleted ? (
+                    <p class="muted">（已刪除）</p>
+                  ) : r.score === null ? (
+                    <p class="muted">（還沒送出）</p>
+                  ) : (
+                    <p>
+                      <strong>{r.score} 分</strong>・{r.comment}
+                    </p>
+                  )}
+                </div>
+                {r.score !== null && (
+                  <button
+                    class="btn btn-secondary btn-small"
+                    onClick={() => setDialog({ kind: "delete-review", q: dialog.q, item: r, list: dialog.list })}
+                  >
+                    刪除
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+          <button class="btn btn-block" onClick={close}>
+            關閉
+          </button>
+        </Modal>
+      )}
+      {dialog?.kind === "delete-review" && (
+        <Confirm
+          title={`刪除 ${dialog.item.reviewer} 的評語？`}
+          message={`刪除後，${dialog.item.reviewee} 會看到「這次沒有收到互評」，${dialog.item.reviewer} 也不能再送出。`}
+          confirmLabel="刪除評語"
+          danger
+          onConfirm={async () => {
+            await api("DELETE", `/lesson-questions/${dialog.q.id}/reviews/${dialog.item.reviewerId}`);
+            const list = await api<PeerReviewItem[]>("GET", `/lesson-questions/${dialog.q.id}/reviews`);
+            await load();
+            setDialog({ kind: "reviews", q: dialog.q, list });
+          }}
+          onClose={() => setDialog((d) => (d?.kind === "delete-review" ? { kind: "reviews", q: d.q, list: d.list } : d))}
         />
       )}
       {dialog?.kind === "essays" && (
@@ -438,15 +563,23 @@ function Bar({ label, n, of, correct }: { label: string; n: number; of: number; 
 }
 
 // Answer distribution after 停止作答; correct answers only marked once revealed.
-function Results({ q, revealed, onEssays }: { q: LessonQuestion; revealed: boolean; onEssays: () => void }) {
+function Results(props: { q: LessonQuestion; revealed: boolean; onEssays: () => void; onReviews: () => void }) {
+  const { q, revealed } = props;
   const { answered, correct } = q.stats;
   if (q.type === "essay") {
     return (
       <div class="results">
-        <p>簡答題由老師之後批改。</p>
-        <button class="btn btn-secondary" disabled={!answered} onClick={onEssays}>
-          看作答內容
-        </button>
+        <p>簡答題由老師之後批改。{q.review && `互評完成 ${q.review.done}／${q.review.total} 人（只供參考，不算分）。`}</p>
+        <div class="row">
+          <button class="btn btn-secondary" disabled={!answered} onClick={props.onEssays}>
+            看作答內容
+          </button>
+          {q.review && (
+            <button class="btn btn-secondary" onClick={props.onReviews}>
+              看評語
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -473,7 +606,13 @@ export function AnswerBars({ q, stats, revealed }: { q: Question; stats: Questio
         ))}
       {(q.type === "single" || q.type === "multiple") &&
         q.config.options.map((text, i) => (
-          <Bar key={i} label={`${optionLetter(i)}．${text}`} n={choices[i] ?? 0} of={answered} correct={revealed && q.config.correct.includes(i)} />
+          <Bar
+            key={i}
+            label={`${optionLetter(i)}．${text}`}
+            n={choices[i] ?? 0}
+            of={answered}
+            correct={revealed && q.config.correct.includes(i)}
+          />
         ))}
       {q.type === "fill" &&
         q.config.blanks.map((accepted, i) => (

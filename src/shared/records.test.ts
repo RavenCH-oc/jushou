@@ -40,6 +40,7 @@ const record: LessonRecord = {
   startedAt: "2026-11-05T02:10:00.000Z",
   groupingCount: 0,
   groupings: [],
+  reviews: [],
   students: [
     { id: "A", seat: 1, name: "甲", present: true },
     { id: "B", seat: 2, name: "乙", present: true },
