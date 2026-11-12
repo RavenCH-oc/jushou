@@ -275,10 +275,12 @@ app.post("/lessons/:id/quick", async (c) => {
     db.prepare("UPDATE lesson_questions SET position = position + 1 WHERE lesson_id = ? AND position >= ?").bind(lesson.id, position),
     db
       .prepare(
-        `INSERT INTO lesson_questions (id, lesson_id, position, type, text, note, points, config, status, quick)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', 1)`,
+        `INSERT INTO lesson_questions (id, lesson_id, position, type, text, note, points, config, status, quick, scored)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', 1, ?)`,
       )
-      .bind(id, lesson.id, position, q.type, q.text, q.note, q.points, JSON.stringify(q.config)),
+      // 選擇／是非 have no correct answer until 公布, so they don't count until the teacher
+      // picks one there. Never revealed (asked, glanced at, moved on) = 不計分, not 0 for everyone.
+      .bind(id, lesson.id, position, q.type, q.text, q.note, q.points, JSON.stringify(q.config), q.type === "essay" ? 1 : 0),
     ...openStatements(db, lesson.id, id),
   ]);
   await notify(c.env, lesson.id, "question");

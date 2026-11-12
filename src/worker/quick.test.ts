@@ -109,7 +109,7 @@ describe("臨時出題", () => {
     expect(d.currentQuestionId).toBe(qid);
     expect(d.questions[0]).toMatchObject({
       quick: true,
-      scored: true,
+      scored: false, // no answer yet: counts only once one is picked at 公布
       status: "open",
       points: 1,
       config: { options: ["", "", "", ""], correct: [] },
@@ -306,5 +306,58 @@ describe("這題不計分", () => {
     expect(result.items.map((i) => i.result)).toEqual(["correct", "unscored"]);
     expect(result.items[1].snippet).toBe("（口頭提問）");
     expect([result.score, result.max]).toEqual([2, 2]);
+  });
+});
+
+describe("臨時出題 that was never revealed", () => {
+  it("選擇／是非 stopped but not revealed count in no score; the students are still present", async () => {
+    const { id, cls, detail, quick, phones, students } = await lesson(null, 2);
+    const single = await quick({ type: "single", optionCount: 4 });
+    await phones[0].answer(single, 0);
+    await phones[1].answer(single, 1);
+    await teacher("POST", `/lesson-questions/${single}/close`);
+    // Glanced at the bars, then straight on to the next one (stops this one, never revealed).
+    const tf = await quick({ type: "truefalse" });
+    await phones[0].answer(tf, true);
+    // An essay quick question still counts as usual.
+    const essay = await quick({ type: "essay" });
+    await phones[1].answer(essay, "我的想法");
+    const live = await detail();
+    expect(live.questions.map((x) => [x.status, x.scored])).toEqual([
+      ["closed", false],
+      ["closed", false],
+      ["open", true],
+    ]);
+    await teacher("POST", `/lessons/${id}/end`);
+
+    const record = (await teacher<RecordDetail>("GET", `/records/${id}`)).data;
+    expect(record.questions.map((x) => [x.status, x.scored])).toEqual([
+      ["closed", false],
+      ["closed", false],
+      ["closed", true],
+    ]);
+    const a = analyze(parseRecord(record));
+    expect(a.max).toBe(1); // only the essay
+    expect(a.students.map((s) => s.score)).toEqual([0, 0]);
+    expect(a.students.map((s) => s.present)).toEqual([true, true]);
+    expect(a.questions.map((x) => x.rate)).toEqual([null, null, null]);
+    const [summary] = (await teacher<LessonSummary[]>("GET", `/classes/${cls.id}/records`)).data;
+    expect(summary).toMatchObject({ max: 1, scoreSum: 0, present: 2, ungraded: 1 });
+    for (const s of students) {
+      const h = (await teacher<StudentHistory>("GET", `/students/${s.id}/history`)).data;
+      expect(h.lessons[0]).toMatchObject({ present: true, max: 1 });
+    }
+  });
+
+  it("picking an answer at 公布 makes it count", async () => {
+    const { quick, phones, detail } = await lesson(null, 1);
+    const qid = await quick({ type: "truefalse" });
+    await phones[0].answer(qid, true);
+    await teacher("POST", `/lesson-questions/${qid}/close`);
+    expect((await detail()).questions[0].scored).toBe(false);
+    await teacher("POST", `/lesson-questions/${qid}/reveal`, { answer: true });
+    expect((await detail()).questions[0]).toMatchObject({ scored: true, status: "revealed" });
+    expect((await phones[0].state()).data.current?.reveal).toMatchObject({ result: { status: "correct", score: 1 } });
+    expect((await phones[0].state()).data.current?.reveal?.unscored).toBeUndefined();
   });
 });
