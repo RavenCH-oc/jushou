@@ -54,7 +54,7 @@
 .verdict-mark { font-size: 48px; line-height: 1; }
 .verdict-correct { color: #1b6e2a; background: #eaf6ec; }
 .verdict-wrong { color: var(--danger); background: #fdeceb; }
-.verdict-unanswered, .verdict-pending, .verdict-graded { color: var(--text); background: var(--bg-soft); }
+.verdict-unanswered, .verdict-pending, .verdict-graded, .verdict-unscored { color: var(--text); background: var(--bg-soft); }
 .verdict-score { text-align: center; font-size: 24px; font-weight: 700; }
 .reveal-text { font-size: 22px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
 

@@ -10,6 +10,8 @@ import { toStudentView } from "../shared/grading";
 import { optionLetter, typeLabel, type Question } from "../shared/questions";
 import type { ActiveLesson, EssayAnswer, LessonDetail, LessonQuestion, PeerReviewItem, QuestionStats } from "../shared/lesson";
 import type { ClassSummary, QuestionSetSummary } from "../shared/types";
+import { ORAL_LABEL } from "../shared/quick";
+import { PickerDialog, QuickDialog, TimerDialog, TimerDisplay, type QuickRequest, type TimerState } from "./tools";
 
 // --- Start a lesson ---
 
@@ -24,7 +26,7 @@ export function StartLesson({ classId }: { classId: string }) {
     [],
   );
   const [cls, setCls] = useState(classId);
-  const [set, setSet] = useState("");
+  const [set, setSet] = useState(""); // "none": 不用題組
   const [confirmEnd, setConfirmEnd] = useState(false);
   const action = useAction();
 
@@ -32,7 +34,7 @@ export function StartLesson({ classId }: { classId: string }) {
   const [classes, sets, active] = data;
 
   const start = async () => {
-    const lesson = await api<{ id: string }>("POST", "/lessons", { classId: cls, setId: set });
+    const lesson = await api<{ id: string }>("POST", "/lessons", { classId: cls, setId: set === "none" ? null : set });
     location.replace(href(`/lesson/${lesson.id}`));
   };
 
@@ -63,7 +65,13 @@ export function StartLesson({ classId }: { classId: string }) {
         </fieldset>
         <fieldset class="choices">
           <legend>2. 用哪一份題組？</legend>
-          {sets.length === 0 && <p class="muted">還沒有題組，請先回首頁新增題組。</p>}
+          <label class={`choice${set === "none" ? " choice-on" : ""}`}>
+            <input type="radio" name="set" checked={set === "none"} onChange={() => setSet("none")} />
+            <span>
+              不用題組<span class="muted">（只用臨時出題、抽人、計時器）</span>
+            </span>
+          </label>
+          {sets.length === 0 && <p class="muted">還沒有題組。要用題組的話，請先回首頁新增。</p>}
           {sets.map((s) => (
             <label key={s.id} class={`choice${set === s.id ? " choice-on" : ""}`}>
               <input type="radio" name="set" checked={set === s.id} disabled={!s.questionCount} onChange={() => setSet(s.id)} />
@@ -113,13 +121,21 @@ type Dialog =
   | { kind: "end-review"; left: number; label: string; run: () => Promise<void> }
   | { kind: "reviews-warn"; q: LessonQuestion }
   | { kind: "reviews"; q: LessonQuestion; list: PeerReviewItem[] }
-  | { kind: "delete-review"; q: LessonQuestion; item: PeerReviewItem; list: PeerReviewItem[] };
+  | { kind: "delete-review"; q: LessonQuestion; item: PeerReviewItem; list: PeerReviewItem[] }
+  | { kind: "quick" }
+  | { kind: "picker" }
+  | { kind: "timer" };
+
+// The answer the teacher picked for a stopped 臨時出題, before 公布答案.
+type Pick = { qid: string; answer: number | boolean } | { qid: string; unscored: true };
 
 export function LessonPage({ id }: { id: string }) {
   const [lesson, setLesson] = useState<LessonDetail | null>(null);
   const [loadError, setLoadError] = useState("");
   const [focusId, setFocusId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<Dialog | null>(null);
+  const [pick, setPick] = useState<Pick | null>(null);
+  const [timerState, setTimerState] = useState<TimerState | null>(null);
   const action = useAction();
   const close = () => setDialog(null);
 
@@ -169,13 +185,13 @@ export function LessonPage({ id }: { id: string }) {
     0,
     questions.findIndex((q) => q.id === (focusId ?? currentId)),
   );
-  const q = questions[index];
+  const q = questions[index] as LessonQuestion | undefined; // none yet in a lesson without a 題組
   const joined = lesson.students.filter((s) => s.joined);
-  const call = async (s: "open" | "close" | "reveal" | "review", target = q) => {
-    await api("POST", `/lesson-questions/${target.id}/${s}`);
+  const call = async (s: "open" | "close" | "reveal" | "review", target = q!, body?: object) => {
+    await api("POST", `/lesson-questions/${target.id}/${s}`, body);
     await load();
   };
-  const step = (s: "open" | "close" | "reveal" | "review", target = q) => action.run(() => call(s, target));
+  const step = (s: "open" | "close" | "reveal" | "review", target = q!) => action.run(() => call(s, target));
 
   // Moving on while 互評 is going ends it; ask first if someone hasn't sent theirs.
   const reviewing = questions.find((x) => x.status === "reviewing");
@@ -183,11 +199,36 @@ export function LessonPage({ id }: { id: string }) {
   const endingReview = (label: string, run: () => Promise<void>) => () =>
     left > 0 ? setDialog({ kind: "end-review", left, label, run }) : action.run(run);
 
+  // 臨時出題: made and pushed in one go (same as 出這一題, so it may end 互評 first).
+  const createQuick = async (req: QuickRequest) => {
+    await api("POST", `/lessons/${lesson.id}/quick`, req);
+    setFocusId(null);
+    await load();
+  };
+  const onQuick = async (req: QuickRequest) => {
+    if (left > 0) setDialog({ kind: "end-review", left, label: "結束互評，出這一題", run: () => createQuick(req) });
+    else {
+      await createQuick(req);
+      setDialog(null);
+    }
+  };
+
   const next = questions[index + 1];
   let main: { label: string; run: () => void; disabled?: boolean };
   const extra: { label: string; run: () => void }[] = [];
   let note = "";
-  if (q.status === "pending")
+  // A stopped 臨時出題 (選擇／是非) needs its correct answer, or 「不計分」, before 公布.
+  const needsAnswer = !!q && q.quick && q.status === "closed" && q.type !== "essay";
+  const picked = needsAnswer && pick?.qid === q.id ? pick : null;
+  if (!q) main = { label: "臨時出題", run: () => setDialog({ kind: "quick" }) };
+  else if (needsAnswer) {
+    main = {
+      label: "公布答案",
+      disabled: !picked,
+      run: () => action.run(() => call("reveal", q, "unscored" in picked! ? { unscored: true } : { answer: picked!.answer })),
+    };
+    if (!picked) note = "請先選正確答案，或選這題不計分。";
+  } else if (q.status === "pending")
     main = { label: currentId ? "出這一題" : "出第 1 題", run: endingReview("結束互評，出這一題", () => call("open")) };
   else if (q.status === "open") main = { label: "停止作答", run: () => step("close") };
   else if (q.status === "closed" && q.type === "essay") {
@@ -202,33 +243,51 @@ export function LessonPage({ id }: { id: string }) {
   // After revealing, the next question goes straight to the students.
   else if (next?.status === "pending") main = { label: "出下一題", run: () => step("open", next) };
   else if (next) main = { label: "下一題", run: () => setFocusId(next.id) };
+  // Only 臨時出題 so far (e.g. 不用題組): the next thing is most likely another one.
+  else if (questions.every((x) => x.quick)) main = { label: "臨時出題", run: () => setDialog({ kind: "quick" }) };
   else main = { label: "結束上課", run: () => setDialog({ kind: "end" }) };
-  const showReviews = () => setDialog({ kind: "reviews-warn", q });
+  const showReviews = () => q && setDialog({ kind: "reviews-warn", q });
 
   return (
     <main class="lesson">
       <header class="lesson-bar">
-        <a class="back" href={href("/")}>
-          ← 回首頁（課會繼續進行）
-        </a>
-        <h1 class="lesson-title">
-          {lesson.className}・{lesson.setName}
-        </h1>
-        <div class="row">
-          <button class="btn btn-secondary" onClick={() => setDialog({ kind: "join" })}>
-            加入碼
-          </button>
-          <button class="btn btn-secondary" onClick={() => setDialog({ kind: "roster" })}>
-            名單（{joined.length}）
-          </button>
-          <FullscreenButton />
-          <button class="btn btn-secondary" onClick={() => setDialog({ kind: "end" })}>
-            結束上課
-          </button>
+        <div class="lesson-head">
+          <a class="back" href={href("/")}>
+            ← 回首頁（課會繼續進行）
+          </a>
+          <h1 class="lesson-title">
+            {lesson.className}・{lesson.setName}
+          </h1>
+          {timerState && <TimerDisplay timer={timerState} onChange={setTimerState} onClose={() => setTimerState(null)} />}
+        </div>
+        <div class="lesson-tools">
+          <div class="row">
+            <button class="btn btn-secondary" onClick={() => setDialog({ kind: "quick" })}>
+              臨時出題
+            </button>
+            <button class="btn btn-secondary" onClick={() => setDialog({ kind: "picker" })}>
+              抽人
+            </button>
+            <button class="btn btn-secondary" onClick={() => setDialog({ kind: "timer" })}>
+              計時器
+            </button>
+          </div>
+          <div class="row">
+            <button class="btn btn-secondary" onClick={() => setDialog({ kind: "join" })}>
+              加入碼
+            </button>
+            <button class="btn btn-secondary" onClick={() => setDialog({ kind: "roster" })}>
+              名單（{joined.length}）
+            </button>
+            <FullscreenButton />
+            <button class="btn btn-secondary" onClick={() => setDialog({ kind: "end" })}>
+              結束上課
+            </button>
+          </div>
         </div>
       </header>
 
-      {!currentId ? (
+      {!currentId || !q ? (
         <section class="stack-lg">
           <JoinPanel lesson={lesson} />
           <ErrorText message={action.error} />
@@ -243,7 +302,8 @@ export function LessonPage({ id }: { id: string }) {
               <li key={x.id}>
                 <button class={`lesson-item${x === q ? " lesson-item-on" : ""}`} aria-current={x === q} onClick={() => setFocusId(x.id)}>
                   <span>
-                    {i + 1}. {x.text.replace(/\s+/g, " ").slice(0, 20)}
+                    {i + 1}. {x.text.replace(/\s+/g, " ").slice(0, 20) || ORAL_LABEL}
+                    {x.quick && <span class="tag">臨時</span>}
                   </span>
                   <span class={`lesson-status status-${x.status}`}>{STATUS_LABEL[x.status]}</span>
                 </button>
@@ -252,17 +312,19 @@ export function LessonPage({ id }: { id: string }) {
           </ol>
           <section class="lesson-main">
             <p class="lesson-meta">
-              第 {index + 1} 題・{typeLabel(q.type)}・{q.points} 分　<strong class={`status-${q.status}`}>{STATUS_LABEL[q.status]}</strong>
+              第 {index + 1} 題・{q.quick ? "臨時出題・" : ""}
+              {typeLabel(q.type)}・{q.points} 分　<strong class={`status-${q.status}`}>{STATUS_LABEL[q.status]}</strong>
             </p>
             {q.status === "pending" || q.status === "open" ? (
               <div class="projected">
-                <QuestionView q={toStudentView(q)} />
+                <QuestionView q={toStudentView(q)} oral={ORAL_LABEL} />
               </div>
             ) : (
               <div class="projected">
-                <QuestionText q={toStudentView(q)} />
+                <QuestionText q={toStudentView(q)} oral={ORAL_LABEL} />
               </div>
             )}
+            {needsAnswer && <AnswerPicker q={q} pick={picked} onPick={setPick} />}
             {(q.status === "closed" || q.status === "revealed") && (
               <Results
                 q={q}
@@ -323,7 +385,7 @@ export function LessonPage({ id }: { id: string }) {
                 <th>座號</th>
                 <th>姓名</th>
                 <th>狀態</th>
-                <th>第 {index + 1} 題</th>
+                {q && <th>第 {index + 1} 題</th>}
                 <th />
               </tr>
             </thead>
@@ -333,7 +395,7 @@ export function LessonPage({ id }: { id: string }) {
                   <td>{s.seat}</td>
                   <td>{s.name}</td>
                   <td>{s.joined ? "已加入" : <span class="muted">未加入</span>}</td>
-                  <td>{q.answeredBy.includes(s.id) ? "已交" : <span class="muted">未交</span>}</td>
+                  {q && <td>{q.answeredBy.includes(s.id) ? "已交" : <span class="muted">未交</span>}</td>}
                   <td>
                     {s.bound && (
                       <button
@@ -466,6 +528,19 @@ export function LessonPage({ id }: { id: string }) {
           onClose={() => setDialog((d) => (d?.kind === "delete-review" ? { kind: "reviews", q: d.q, list: d.list } : d))}
         />
       )}
+      {dialog?.kind === "quick" && <QuickDialog onCreate={onQuick} onClose={close} />}
+      {dialog?.kind === "picker" && (
+        <PickerDialog lessonId={lesson.id} classId={lesson.classId} students={lesson.students} onClose={close} />
+      )}
+      {dialog?.kind === "timer" && (
+        <TimerDialog
+          onStart={(seconds) => {
+            setTimerState({ total: seconds * 1000, endsAt: Date.now() + seconds * 1000, leftWhenPaused: 0 });
+            close();
+          }}
+          onClose={close}
+        />
+      )}
       {dialog?.kind === "essays" && (
         <Modal wide title={`作答內容（${dialog.list.length} 份）`} onClose={close}>
           <ul class="essay-list">
@@ -583,14 +658,16 @@ function Results(props: { q: LessonQuestion; revealed: boolean; onEssays: () => 
       </div>
     );
   }
+  const scoredReveal = revealed && q.scored;
   return (
     <div class="results">
-      {revealed && (
+      {revealed && !q.scored && <p class="correct-rate">這題不計分（只看大家怎麼選）</p>}
+      {scoredReveal && (
         <p class="correct-rate">
           答對 {correct} 人，正確率 {percent(correct, answered)}%
         </p>
       )}
-      <AnswerBars q={q} stats={q.stats} revealed={revealed} />
+      <AnswerBars q={q} stats={q.stats} revealed={scoredReveal} />
     </div>
   );
 }
@@ -608,7 +685,7 @@ export function AnswerBars({ q, stats, revealed }: { q: Question; stats: Questio
         q.config.options.map((text, i) => (
           <Bar
             key={i}
-            label={`${optionLetter(i)}．${text}`}
+            label={text ? `${optionLetter(i)}．${text}` : optionLetter(i)}
             n={choices[i] ?? 0}
             of={answered}
             correct={revealed && q.config.correct.includes(i)}
@@ -619,5 +696,42 @@ export function AnswerBars({ q, stats, revealed }: { q: Question; stats: Questio
           <Bar key={i} label={`第 ${i + 1} 格答對${revealed ? `（${accepted.join("、")}）` : ""}`} n={blanks[i] ?? 0} of={answered} />
         ))}
     </ul>
+  );
+}
+
+// 臨時出題 after 停止作答: the teacher says which answer was right, or that it doesn't count.
+function AnswerPicker({ q, pick, onPick }: { q: LessonQuestion; pick: Pick | null; onPick: (p: Pick) => void }) {
+  const options: { label: string; value: number | boolean }[] =
+    q.type === "truefalse"
+      ? [
+          { label: "○ 對", value: true },
+          { label: "✕ 錯", value: false },
+        ]
+      : q.type === "single"
+        ? q.config.options.map((_, i) => ({ label: optionLetter(i), value: i }))
+        : [];
+  const chosen = pick && "answer" in pick ? pick.answer : null;
+  const unscored = !!pick && "unscored" in pick;
+  return (
+    <div class="answer-picker">
+      <span class="answer-picker-label">正確答案是：</span>
+      {options.map((o) => (
+        <button
+          key={String(o.value)}
+          class={`btn answer-choice${chosen === o.value ? "" : " btn-secondary"}`}
+          aria-pressed={chosen === o.value}
+          onClick={() => onPick({ qid: q.id, answer: o.value })}
+        >
+          {o.label}
+        </button>
+      ))}
+      <button
+        class={`btn${unscored ? "" : " btn-secondary"}`}
+        aria-pressed={unscored}
+        onClick={() => onPick({ qid: q.id, unscored: true })}
+      >
+        這題不計分（只看大家怎麼選）
+      </button>
+    </div>
   );
 }

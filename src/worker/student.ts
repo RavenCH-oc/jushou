@@ -60,7 +60,7 @@ async function current(db: D1Database, lessonId: string, questionId: string, me:
   ]);
   const question = toQuestion(row);
   const out: StudentCurrent = {
-    question: toStudentView(question), // never the answers before they're revealed
+    question: toStudentView({ ...question, quick: !!row.quick }), // never the answers before they're revealed
     number: (counts?.before ?? 0) + 1,
     total: counts?.total ?? 1,
     status: row.status,
@@ -70,7 +70,7 @@ async function current(db: D1Database, lessonId: string, questionId: string, me:
     const result: GradeResult = mine
       ? { status: mine.status, score: mine.score, ...(mine.blanks ? { blanks: JSON.parse(mine.blanks) } : {}) }
       : gradeAnswer(question, null);
-    out.reveal = { result, question };
+    out.reveal = { result, question, ...(row.scored ? {} : { unscored: true as const }) };
   }
   if (row.type === "essay" && (row.status === "reviewing" || row.status === "revealed")) await addPeerReview(db, row, me, out);
   return out;
@@ -101,6 +101,9 @@ async function addPeerReview(db: D1Database, row: LessonQuestionRow, me: Me, out
   if (got) out.received = got.score !== null ? { score: got.score, comment: got.comment ?? "" } : null;
 }
 
+// First 20 characters of a question; a 臨時出題 may have none (asked out loud).
+const snippetOf = (text: string) => text.replace(/\s+/g, " ").slice(0, 20) || "（口頭提問）";
+
 // Midnight in Taiwan (UTC+8, no daylight saving), as the ISO string lessons store.
 export function startOfTaipeiDay(at = new Date()) {
   const offset = 8 * 3600_000;
@@ -120,18 +123,30 @@ async function todaysResult(db: D1Database, classId: string, me: Me): Promise<Le
   if (!lesson) return null;
   const { results } = await db
     .prepare(
-      `SELECT q.text, q.type, q.points, q.status, a.status AS result, a.score
+      `SELECT q.text, q.type, q.points, q.status, q.scored, a.status AS result, a.score
        FROM lesson_questions q LEFT JOIN answers a ON a.lesson_question_id = q.id AND a.student_id = ?
        WHERE q.lesson_id = ? ORDER BY q.position`,
     )
     .bind(me.id, lesson.id)
-    .all<{ text: string; type: string; points: number; status: string; result: GradeResult["status"] | null; score: number | null }>();
+    .all<{
+      text: string;
+      type: string;
+      points: number;
+      status: string;
+      scored: number;
+      result: GradeResult["status"] | null;
+      score: number | null;
+    }>();
   const out: LessonResult = { setName: lesson.set_name, items: [], score: 0, max: 0 };
   results.forEach((r, i) => {
     const revealed = r.status === "revealed";
+    if (revealed && !r.scored) {
+      out.items.push({ number: i + 1, snippet: snippetOf(r.text), result: "unscored", score: null });
+      return;
+    }
     const result = revealed ? (r.result ?? "unanswered") : "hidden";
     const score = revealed ? (r.result ? r.score : 0) : null;
-    out.items.push({ number: i + 1, snippet: r.text.replace(/\s+/g, " ").slice(0, 20), result, score });
+    out.items.push({ number: i + 1, snippet: snippetOf(r.text), result, score });
     if (revealed && r.type !== "essay") {
       out.max += r.points;
       out.score += score ?? 0;

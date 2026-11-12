@@ -13,6 +13,8 @@ import type {
   QuestionStatus,
 } from "../shared/lesson";
 import { assignReviews } from "../shared/peer-review";
+import { gradeAnswer } from "../shared/grading";
+import { QUICK_SET_NAME, revealQuick, validateQuick } from "../shared/quick";
 import { notify } from "./lesson-hub";
 import { fail, now, readBody } from "./util";
 
@@ -32,6 +34,8 @@ export type LessonQuestionRow = {
   points: number;
   config: string;
   status: QuestionStatus;
+  quick: number; // 臨時出題
+  scored: number; // 0: 「這題不計分」
 };
 
 export function toQuestion(r: LessonQuestionRow): Question {
@@ -66,26 +70,32 @@ function stats(q: Question, rows: AnswerRow[]): QuestionStats {
 app.get("/lessons/active", async (c) => c.json(await activeLesson(c.env.DB)));
 
 // Body: { classId, setId }. Copies every question of the set into the lesson.
+// setId null: 不用題組, only 臨時出題 (the lesson is named 隨堂).
 app.post("/lessons", async (c) => {
   const { classId, setId } = await readBody(c);
   const db = c.env.DB;
+  const noSet = setId === null;
   const [cls, set, active] = await Promise.all([
     db
       .prepare("SELECT id, (SELECT COUNT(*) FROM students WHERE class_id = classes.id) AS n FROM classes WHERE id = ?")
       .bind(classId)
       .first<{ id: string; n: number }>(),
-    db.prepare("SELECT id, name FROM question_sets WHERE id = ?").bind(setId).first<{ id: string; name: string }>(),
+    noSet
+      ? { id: null, name: QUICK_SET_NAME }
+      : db
+          .prepare("SELECT id, name FROM question_sets WHERE id = ?")
+          .bind(setId ?? "")
+          .first<{ id: string; name: string }>(),
     activeLesson(db),
   ]);
   if (!cls) return fail(c, "找不到這個班級，可能已經被刪除。", 404);
   if (!set) return fail(c, "找不到這個題組，可能已經被刪除。", 404);
   if (active) return fail(c, `「${active.className}」正在上課，請先結束那堂課。`, 409);
   if (!cls.n) return fail(c, "這個班級還沒有學生，請先加入學生名冊。");
-  const { results: questions } = await db
-    .prepare("SELECT * FROM questions WHERE set_id = ? ORDER BY position")
-    .bind(set.id)
-    .all<LessonQuestionRow>();
-  if (!questions.length) return fail(c, "這個題組還沒有題目，請先出題。");
+  const { results: questions } = set.id
+    ? await db.prepare("SELECT * FROM questions WHERE set_id = ? ORDER BY position").bind(set.id).all<LessonQuestionRow>()
+    : { results: [] };
+  if (set.id && !questions.length) return fail(c, "這個題組還沒有題目，請先出題。");
 
   const id = crypto.randomUUID();
   const insertQuestion = db.prepare(
@@ -166,6 +176,8 @@ app.get("/lessons/:id", async (c) => {
       return {
         ...q,
         status: row.status,
+        quick: !!row.quick,
+        scored: !!row.scored,
         answeredBy: rows.map((r) => r.student_id),
         stats: stats(q, rows),
         ...(review ? { review: { done: review.done, total: review.total } } : {}),
@@ -188,11 +200,11 @@ const CHANGED = "這一題的狀態已經變了，畫面會自動更新。";
 function findQuestion(db: D1Database, id: string) {
   return db
     .prepare(
-      `SELECT q.id, q.type, q.status, q.lesson_id, l.status AS lesson_status
+      `SELECT q.id, q.type, q.status, q.quick, q.lesson_id, l.status AS lesson_status
        FROM lesson_questions q JOIN lessons l ON l.id = q.lesson_id WHERE q.id = ?`,
     )
     .bind(id)
-    .first<{ id: string; type: string; status: QuestionStatus; lesson_id: string; lesson_status: string }>();
+    .first<{ id: string; type: string; status: QuestionStatus; quick: number; lesson_id: string; lesson_status: string }>();
 }
 
 // 開始互評: pair up everyone who answered this 簡答. Fixed from now on, whoever joins or leaves.
@@ -229,6 +241,50 @@ app.post("/lesson-questions/:id/review", async (c) => {
   return c.json({ ok: true });
 });
 
+// Statements that put one question in front of the students: whatever they were on
+// stops (open → closed, reviewing → revealed) and this one opens.
+function openStatements(db: D1Database, lessonId: string, questionId: string) {
+  return [
+    db.prepare("UPDATE lesson_questions SET status = 'closed' WHERE lesson_id = ? AND status = 'open'").bind(lessonId),
+    db.prepare("UPDATE lesson_questions SET status = 'revealed' WHERE lesson_id = ? AND status = 'reviewing'").bind(lessonId),
+    db.prepare("UPDATE lesson_questions SET status = 'open' WHERE id = ?").bind(questionId),
+    db.prepare("UPDATE lessons SET current_question_id = ? WHERE id = ?").bind(questionId, lessonId),
+  ];
+}
+
+// 臨時出題. Body: { type, optionCount?, text? }. Goes right after the question the
+// students saw last (first if none yet), so 出下一題 afterwards carries on with the
+// set, and is pushed to the students straight away.
+app.post("/lessons/:id/quick", async (c) => {
+  const db = c.env.DB;
+  const lesson = await db
+    .prepare("SELECT id, status, current_question_id FROM lessons WHERE id = ?")
+    .bind(c.req.param("id"))
+    .first<{ id: string; status: string; current_question_id: string | null }>();
+  if (!lesson) return fail(c, LESSON_GONE, 404);
+  if (lesson.status !== "active") return fail(c, LESSON_ENDED, 409);
+  const checked = validateQuick(await readBody(c));
+  if ("error" in checked) return fail(c, checked.error);
+  const q = checked.value;
+  const current = lesson.current_question_id
+    ? await db.prepare("SELECT position FROM lesson_questions WHERE id = ?").bind(lesson.current_question_id).first<{ position: number }>()
+    : null;
+  const position = current ? current.position + 1 : 0;
+  const id = crypto.randomUUID();
+  await db.batch([
+    db.prepare("UPDATE lesson_questions SET position = position + 1 WHERE lesson_id = ? AND position >= ?").bind(lesson.id, position),
+    db
+      .prepare(
+        `INSERT INTO lesson_questions (id, lesson_id, position, type, text, note, points, config, status, quick)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', 1)`,
+      )
+      .bind(id, lesson.id, position, q.type, q.text, q.note, q.points, JSON.stringify(q.config)),
+    ...openStatements(db, lesson.id, id),
+  ]);
+  await notify(c.env, lesson.id, "question");
+  return c.json({ id }, 201);
+});
+
 app.post("/lesson-questions/:id/:step", async (c) => {
   const step = STEPS[c.req.param("step")];
   if (!step) return fail(c, "找不到這個功能。", 404);
@@ -239,13 +295,34 @@ app.post("/lesson-questions/:id/:step", async (c) => {
   if (row.status === step.to) return c.json({ ok: true }); // pressed twice
   if (!step.from.includes(row.status)) return fail(c, CHANGED, 409);
 
-  const stmts = [db.prepare("UPDATE lesson_questions SET status = ? WHERE id = ?").bind(step.to, row.id)];
-  if (step.to === "open") {
+  const body = step.to === "revealed" ? await readBody(c) : {};
+  const setsAnswer = body.answer !== undefined || body.unscored !== undefined;
+  if (setsAnswer && !row.quick) return fail(c, "只有臨時出題可以在公布時設定答案。");
+  const stmts =
+    step.to === "open"
+      ? openStatements(db, row.lesson_id, row.id)
+      : [db.prepare("UPDATE lesson_questions SET status = ? WHERE id = ?").bind(step.to, row.id)];
+  if (step.to === "revealed" && row.quick) {
+    // The teacher picks the answer now: save it and grade every answer again with it.
+    const full = await db.prepare("SELECT * FROM lesson_questions WHERE id = ?").bind(row.id).first<LessonQuestionRow>();
+    const revealed = revealQuick(toQuestion(full!), body);
+    if ("error" in revealed) return fail(c, revealed.error);
     stmts.unshift(
-      db.prepare("UPDATE lesson_questions SET status = 'closed' WHERE lesson_id = ? AND status = 'open'").bind(row.lesson_id),
-      db.prepare("UPDATE lesson_questions SET status = 'revealed' WHERE lesson_id = ? AND status = 'reviewing'").bind(row.lesson_id),
+      db
+        .prepare("UPDATE lesson_questions SET config = ?, scored = ? WHERE id = ?")
+        .bind(JSON.stringify(revealed.value.config), revealed.scored ? 1 : 0, row.id),
     );
-    stmts.push(db.prepare("UPDATE lessons SET current_question_id = ? WHERE id = ?").bind(row.id, row.lesson_id));
+    if (revealed.scored && revealed.value.type !== "essay") {
+      const { results } = await db
+        .prepare("SELECT student_id, answer FROM answers WHERE lesson_question_id = ?")
+        .bind(row.id)
+        .all<{ student_id: string; answer: string }>();
+      const update = db.prepare("UPDATE answers SET status = ?, score = ? WHERE lesson_question_id = ? AND student_id = ?");
+      for (const a of results) {
+        const result = gradeAnswer(revealed.value, JSON.parse(a.answer));
+        stmts.push(update.bind(result.status, result.score, row.id, a.student_id));
+      }
+    }
   }
   await db.batch(stmts);
   await notify(c.env, row.lesson_id, "question");

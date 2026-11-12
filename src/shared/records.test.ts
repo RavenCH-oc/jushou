@@ -15,10 +15,40 @@ import {
 } from "./records";
 
 const Q: RecordQuestion[] = [
-  { id: "tf", type: "truefalse", text: "是非", note: "", points: 1, config: { answer: true }, status: "revealed" },
-  { id: "single", type: "single", text: "單選", note: "", points: 2, config: { options: ["甲", "乙", "丙"], correct: [1] }, status: "closed" },
-  { id: "essay", type: "essay", text: "簡答", note: "", points: 5, config: {}, status: "revealed" },
-  { id: "never", type: "fill", text: "＿＿＿", note: "", points: 3, config: { blanks: [["說", "悅"]] }, status: "pending" },
+  {
+    id: "tf",
+    type: "truefalse",
+    text: "是非",
+    note: "",
+    points: 1,
+    config: { answer: true },
+    status: "revealed",
+    quick: false,
+    scored: true,
+  },
+  {
+    id: "single",
+    type: "single",
+    text: "單選",
+    note: "",
+    points: 2,
+    config: { options: ["甲", "乙", "丙"], correct: [1] },
+    status: "closed",
+    quick: false,
+    scored: true,
+  },
+  { id: "essay", type: "essay", text: "簡答", note: "", points: 5, config: {}, status: "revealed", quick: false, scored: true },
+  {
+    id: "never",
+    type: "fill",
+    text: "＿＿＿",
+    note: "",
+    points: 3,
+    config: { blanks: [["說", "悅"]] },
+    status: "pending",
+    quick: false,
+    scored: true,
+  },
 ];
 
 const ans = (questionId: string, studentId: string, a: Partial<RecordAnswer>): RecordAnswer => ({

@@ -12,8 +12,8 @@ const app = new Hono<AppEnv>();
 
 const RECORD_GONE = "找不到這堂課的紀錄，可能已經被刪除。";
 
-// Points only count for asked questions.
-const ASKED = "q.status <> 'pending'";
+// Points only count for asked questions, and not for 「這題不計分」 (臨時出題).
+const COUNTED = "q.status <> 'pending' AND q.scored = 1";
 // 出席: joined, or sent any answer in the lesson. So every answer row counts toward
 // the scores, even from a student unbound mid-lesson who never came back.
 const attended = (lesson: string, student: string) =>
@@ -27,11 +27,11 @@ function summaries(db: D1Database, where: string, binds: unknown[], limit = -1) 
       `SELECT l.id, l.class_id AS classId, c.name AS className, l.set_name AS setName, l.started_at AS startedAt,
          (SELECT COUNT(*) FROM students s WHERE s.class_id = l.class_id AND ${attended("l.id", "s.id")}) AS present,
          (SELECT COUNT(*) FROM students s WHERE s.class_id = l.class_id) AS total,
-         (SELECT COALESCE(SUM(q.points), 0) FROM lesson_questions q WHERE q.lesson_id = l.id AND ${ASKED}) AS max,
+         (SELECT COALESCE(SUM(q.points), 0) FROM lesson_questions q WHERE q.lesson_id = l.id AND ${COUNTED}) AS max,
          (SELECT COALESCE(SUM(a.score), 0) FROM answers a JOIN lesson_questions q ON q.id = a.lesson_question_id
-            WHERE q.lesson_id = l.id AND ${ASKED}) AS scoreSum,
+            WHERE q.lesson_id = l.id AND ${COUNTED}) AS scoreSum,
          (SELECT COUNT(*) FROM answers a JOIN lesson_questions q ON q.id = a.lesson_question_id
-            WHERE q.lesson_id = l.id AND ${ASKED} AND a.status = 'pending') AS ungraded
+            WHERE q.lesson_id = l.id AND ${COUNTED} AND a.status = 'pending') AS ungraded
        FROM lessons l JOIN classes c ON c.id = l.class_id
        WHERE l.status = 'ended' ${where}
        ORDER BY l.started_at DESC LIMIT ?`,
@@ -116,7 +116,7 @@ app.get("/records/:id", async (c) => {
     groupingCount: groupings ? groupings.length : lesson.groupings,
     groupings,
     students: students.results.map((s) => ({ ...s, present: !!s.present })),
-    questions: questions.results.map((q) => ({ ...toQuestion(q), status: q.status })),
+    questions: questions.results.map((q) => ({ ...toQuestion(q), status: q.status, quick: !!q.quick, scored: !!q.scored })),
     answers: answers.results,
     reviews: reviews.results,
   };
@@ -170,11 +170,11 @@ app.get("/students/:id/history", async (c) => {
     .prepare(
       `SELECT l.id, l.set_name AS setName, l.started_at AS startedAt,
          ${attended("l.id", "?1")} AS present,
-         (SELECT COALESCE(SUM(q.points), 0) FROM lesson_questions q WHERE q.lesson_id = l.id AND ${ASKED}) AS max,
+         (SELECT COALESCE(SUM(q.points), 0) FROM lesson_questions q WHERE q.lesson_id = l.id AND ${COUNTED}) AS max,
          (SELECT COALESCE(SUM(a.score), 0) FROM answers a JOIN lesson_questions q ON q.id = a.lesson_question_id
-            WHERE q.lesson_id = l.id AND ${ASKED} AND a.student_id = ?1) AS score,
+            WHERE q.lesson_id = l.id AND ${COUNTED} AND a.student_id = ?1) AS score,
          (SELECT COUNT(*) FROM answers a JOIN lesson_questions q ON q.id = a.lesson_question_id
-            WHERE q.lesson_id = l.id AND ${ASKED} AND a.student_id = ?1 AND a.status = 'pending') AS ungraded
+            WHERE q.lesson_id = l.id AND ${COUNTED} AND a.student_id = ?1 AND a.status = 'pending') AS ungraded
        FROM lessons l WHERE l.class_id = ?2 AND l.status = 'ended' ORDER BY l.started_at DESC`,
     )
     .bind(id, student.classId)

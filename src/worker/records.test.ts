@@ -326,7 +326,9 @@ describe("summaries stay cheap with a semester of data", () => {
         const qid = `${lid}Q${q}`;
         stmts.push(
           db
-            .prepare("INSERT INTO lesson_questions VALUES (?, ?, ?, 'single', '題目', '', 1, ?, 'revealed')")
+            .prepare(
+              "INSERT INTO lesson_questions (id, lesson_id, position, type, text, note, points, config, status) VALUES (?, ?, ?, 'single', '題目', '', 1, ?, 'revealed')",
+            )
             .bind(qid, lid, q, JSON.stringify({ options: ["甲", "乙"], correct: [0] })),
         );
         for (const [i, sid] of studentIds.slice(0, 28).entries()) {

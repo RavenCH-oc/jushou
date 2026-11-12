@@ -14,7 +14,8 @@ const VERDICT = {
 } as const;
 
 export function Reveal({ current }: { current: StudentCurrent }) {
-  const { result, question } = current.reveal!;
+  const { result, question, unscored } = current.reveal!;
+  if (unscored) return <Unscored current={current} question={question} />;
   const [mark, label] = VERDICT[result.status];
   return (
     <div class="stack">
@@ -33,6 +34,28 @@ export function Reveal({ current }: { current: StudentCurrent }) {
       <p class="muted">第 {current.number} 題</p>
       <p class="reveal-text">{question.text}</p>
       <CorrectAnswer question={question} answer={current.answer} blanks={result.blanks} />
+    </div>
+  );
+}
+
+// 「這題不計分」: what this student picked, without right or wrong.
+function Unscored({ current, question: q }: { current: StudentCurrent; question: Question }) {
+  const answer = current.answer;
+  let mine = "（沒有作答）";
+  if (q.type === "truefalse" && typeof answer === "boolean") mine = answer ? "○ 對" : "✕ 錯";
+  if (q.type === "single" && typeof answer === "number")
+    mine = optionLetter(answer) + (q.config.options[answer] ? `．${q.config.options[answer]}` : "");
+  return (
+    <div class="stack">
+      <p class="verdict verdict-unscored" role="status">
+        這題不計分
+      </p>
+      <p class="muted">第 {current.number} 題</p>
+      {q.text && <p class="reveal-text">{q.text}</p>}
+      <dl class="reveal-list">
+        <dt>你的答案</dt>
+        <dd>{mine}</dd>
+      </dl>
     </div>
   );
 }

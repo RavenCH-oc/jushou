@@ -1,5 +1,6 @@
 // Excel export, built in the browser from the same analysis the pages show.
 // Imported with import() when the teacher presses a 下載 button.
+import { ORAL_LABEL } from "../shared/quick";
 import { buildXlsx, download, fileName, type CellValue, type Sheet } from "./xlsx";
 import { analyze, answerText, dateStamp, formatTaipei, ratio, RESULT_WORD, typeLabel, type LessonRecord } from "../shared/records";
 
@@ -9,9 +10,18 @@ const shortDate = (iso: string) => formatTaipei(iso).replace(/（.*$/, ""); // 1
 
 function scoreSheet(r: LessonRecord, name: string): Sheet {
   const a = analyze(r);
-  const head = ["座號", "姓名", "出席", ...a.asked.map((q, i) => `第${i + 1}題(${q.points}分)`), `總分(滿分${a.max})`];
+  // 「不計分」 questions get no column (see countedQuestions).
+  const head = [
+    "座號",
+    "姓名",
+    "出席",
+    ...a.asked.flatMap((q, i) => (q.scored ? [`第${i + 1}題(${q.points}分)`] : [])),
+    `總分(滿分${a.max})`,
+  ];
   const rows: CellValue[][] = a.students.map((s) =>
-    s.present ? [s.seat, s.name, "出席", ...s.cells.map((c) => c.score), s.score] : [s.seat, s.name, "缺席"],
+    s.present
+      ? [s.seat, s.name, "出席", ...s.cells.flatMap((c) => (c.kind === "unscored" ? [] : [c.score])), s.score]
+      : [s.seat, s.name, "缺席"],
   );
   return { name, rows: [head, ...rows] };
 }
@@ -20,8 +30,8 @@ export function lessonSheets(r: LessonRecord): Sheet[] {
   const a = analyze(r);
   const stats: CellValue[][] = a.questions.map((x) => [
     x.number,
-    typeLabel(x.q.type),
-    x.q.text,
+    typeLabel(x.q.type) + (x.q.scored ? "" : "（不計分）"),
+    x.q.text || ORAL_LABEL,
     x.q.points,
     x.answered,
     pct(x.rate),

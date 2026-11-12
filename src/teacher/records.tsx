@@ -10,6 +10,7 @@ import { AnswerBars } from "./lesson";
 import { QuestionText } from "../student/question-view";
 import { toStudentView } from "../shared/grading";
 import { optionLetter } from "../shared/questions";
+import { ORAL_LABEL } from "../shared/quick";
 import {
   analyze,
   answerText,
@@ -309,11 +310,14 @@ function ScoreTable({ a }: { a: Analysis }) {
           <tr>
             <th>座號</th>
             <th>姓名</th>
-            {a.asked.map((q, i) => (
-              <th key={q.id} class="num" title={questionSnippet(q.text)}>
-                第{i + 1}題
-              </th>
-            ))}
+            {a.asked.map(
+              (q, i) =>
+                q.scored && (
+                  <th key={q.id} class="num" title={questionSnippet(q.text)}>
+                    第{i + 1}題
+                  </th>
+                ),
+            )}
             <th class="num">
               <button class="sort-button" aria-pressed={byScore} onClick={() => setByScore(!byScore)}>
                 總分（滿分 {a.max}）{byScore ? "▼" : "⇅"}
@@ -329,11 +333,14 @@ function ScoreTable({ a }: { a: Analysis }) {
                 <td>
                   <a href={href(`/student/${s.id}`)}>{s.name}</a>
                 </td>
-                {s.cells.map((c, i) => (
-                  <td key={i} class={`num cell-${c.kind}`}>
-                    {cellMark(a.asked[i], c)}
-                  </td>
-                ))}
+                {s.cells.map(
+                  (c, i) =>
+                    c.kind !== "unscored" && (
+                      <td key={i} class={`num cell-${c.kind}`}>
+                        {cellMark(a.asked[i], c)}
+                      </td>
+                    ),
+                )}
                 <td class="num total">{s.score}</td>
               </tr>
             ) : (
@@ -342,13 +349,16 @@ function ScoreTable({ a }: { a: Analysis }) {
                 <td>
                   <a href={href(`/student/${s.id}`)}>{s.name}</a>
                 </td>
-                <td colSpan={a.asked.length + 1}>缺席</td>
+                <td colSpan={a.asked.filter((q) => q.scored).length + 1}>缺席</td>
               </tr>
             ),
           )}
         </tbody>
       </table>
-      <p class="muted table-note">○ 答對　✕ 答錯　— 沒作答　數字是簡答的分數；還沒批改的簡答先算 0 分。</p>
+      <p class="muted table-note">
+        ○ 答對　✕ 答錯　— 沒作答　數字是簡答的分數；還沒批改的簡答先算 0 分。
+        {a.asked.some((q) => !q.scored) && "「不計分」的題目不列在這裡。"}
+      </p>
     </div>
   );
 }
@@ -373,10 +383,13 @@ function QuestionTable({ record, a }: { record: LessonRecord; a: Analysis }) {
               <td>
                 <a href={href(`/record/${id}/q/${x.q.id}`)}>第 {x.number} 題</a>
               </td>
-              <td>{typeLabel(x.q.type)}</td>
+              <td>
+                {typeLabel(x.q.type)}
+                {x.q.quick && <span class="tag">臨時</span>}
+              </td>
               <td class="wrap">{questionSnippet(x.q.text)}</td>
               <td>
-                {x.q.type === "essay" ? `平均 ${oneDecimal(x.average)} 分` : percent(x.rate)}
+                {x.q.type === "essay" ? `平均 ${oneDecimal(x.average)} 分` : x.q.scored ? percent(x.rate) : "不計分"}
                 {x.q.type === "essay" && reviewsOf(record, x.q.id).list.length > 0 && (
                   <span class="muted">・互評平均 {oneDecimal(reviewsOf(record, x.q.id).average)} 分</span>
                 )}
@@ -516,8 +529,9 @@ function QuestionDetail(props: {
         </div>
       </div>
       <div class="card record-question">
-        <QuestionText q={toStudentView(q)} />
-        {q.type !== "essay" && (
+        <QuestionText q={toStudentView(q)} oral={ORAL_LABEL} />
+        {q.type !== "essay" && !q.scored && <p class="record-correct">這題不計分（只看大家怎麼選）</p>}
+        {q.type !== "essay" && q.scored && (
           <p class="record-correct">
             正確答案：<strong>{correctText(q)}</strong>
           </p>
@@ -527,11 +541,13 @@ function QuestionDetail(props: {
         <EssayGrader key={q.id} record={record} q={q} a={a} onGraded={props.onGraded} />
       ) : (
         <>
-          <p class="correct-rate">
-            正確率 {percent(stats.rate)}（答對 {stats.correct}／出席 {a.present} 人）
-          </p>
+          {q.scored && (
+            <p class="correct-rate">
+              正確率 {percent(stats.rate)}（答對 {stats.correct}／出席 {a.present} 人）
+            </p>
+          )}
           {/* Percentages of everyone present, like 正確率 (沒作答 are listed below). */}
-          <AnswerBars q={q} stats={{ ...distribution(q, presentAnswers(a, q)), answered: a.present }} revealed />
+          <AnswerBars q={q} stats={{ ...distribution(q, presentAnswers(a, q)), answered: a.present }} revealed={q.scored} />
           <WhoAnswered a={a} q={q} />
         </>
       )}
@@ -605,12 +621,12 @@ function WhoAnswered({ a, q }: { a: Analysis; q: RecordQuestion }) {
   const options =
     q.type === "truefalse"
       ? [
-          { label: "○ 對", correct: q.config.answer, picked: (v: unknown) => v === true },
-          { label: "✕ 錯", correct: !q.config.answer, picked: (v: unknown) => v === false },
+          { label: "○ 對", correct: q.scored && q.config.answer === true, picked: (v: unknown) => v === true },
+          { label: "✕ 錯", correct: q.scored && q.config.answer === false, picked: (v: unknown) => v === false },
         ]
       : q.config.options.map((text, i) => ({
-          label: `${optionLetter(i)}．${text}`,
-          correct: q.config.correct.includes(i),
+          label: text ? `${optionLetter(i)}．${text}` : optionLetter(i),
+          correct: q.scored && q.config.correct.includes(i),
           picked: (v: unknown) => v === i || (Array.isArray(v) && v.includes(i)),
         }));
   return (
