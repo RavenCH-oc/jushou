@@ -8,6 +8,7 @@ import { QuestionView } from "./question-view";
 import { readJoinLink } from "./join-link";
 import { Reveal } from "./reveal";
 import { Reviewing } from "./peer-review";
+import { BuzzView } from "./buzz";
 import type { Answer } from "../shared/grading";
 import type { LessonResult, StudentCurrent, StudentState } from "../shared/lesson";
 
@@ -188,7 +189,10 @@ function Classroom({ code, onLeave }: { code: string; onLeave: (message?: string
           {error}
         </p>
       )}
-      {screen}
+      {/* 搶答 covers the screen without unmounting it, so a half-written answer is still
+          there (and can still be sent) when the round ends. */}
+      <div hidden={!!state.buzz}>{screen}</div>
+      {state.buzz && <BuzzView key={state.buzz.round} code={code} buzz={state.buzz} onRefresh={refresh} />}
       <OfflineNote connected={connected} />
     </main>
   );

@@ -16,6 +16,7 @@ import { assignReviews } from "../shared/peer-review";
 import { gradeAnswer } from "../shared/grading";
 import { QUICK_SET_NAME, revealQuick, validateQuick } from "../shared/quick";
 import { notify } from "./lesson-hub";
+import { clearBuzz } from "./buzz";
 import { fail, now, readBody } from "./util";
 
 const app = new Hono<AppEnv>();
@@ -121,7 +122,7 @@ app.get("/lessons/:id", async (c) => {
   const db = c.env.DB;
   const lesson = await db
     .prepare(
-      `SELECT l.id, l.status, l.class_id, l.set_name, l.current_question_id, c.name, c.join_code
+      `SELECT l.id, l.status, l.class_id, l.set_name, l.current_question_id, l.buzz_open, c.name, c.join_code
        FROM lessons l JOIN classes c ON c.id = l.class_id WHERE l.id = ?`,
     )
     .bind(c.req.param("id"))
@@ -131,6 +132,7 @@ app.get("/lessons/:id", async (c) => {
       class_id: string;
       set_name: string;
       current_question_id: string | null;
+      buzz_open: number;
       name: string;
       join_code: string;
     }>();
@@ -168,6 +170,7 @@ app.get("/lessons/:id", async (c) => {
     joinCode: lesson.join_code,
     setName: lesson.set_name,
     currentQuestionId: lesson.current_question_id,
+    buzzOpen: !!lesson.buzz_open,
     students: students.results.map((s) => ({ id: s.id, seat: s.seat, name: s.name, bound: !!s.bound, joined: joinedIds.has(s.id) })),
     questions: questions.results.map((row): LessonQuestion => {
       const q = toQuestion(row);
@@ -411,6 +414,7 @@ app.post("/lessons/:id/end", async (c) => {
   await db.batch([
     db.prepare("UPDATE lesson_questions SET status = 'closed' WHERE lesson_id = ? AND status = 'open'").bind(id),
     db.prepare("UPDATE lesson_questions SET status = 'revealed' WHERE lesson_id = ? AND status = 'reviewing'").bind(id),
+    ...clearBuzz(db, id), // 搶答 leaves nothing behind
   ]);
   await notify(c.env, id, "ended");
   return c.json({ ok: true });

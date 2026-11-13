@@ -312,24 +312,6 @@ export function TimerDialog({ onStart, onClose }: { onStart: (seconds: number) =
   );
 }
 
-// One short beep with Web Audio (no sound file).
-function beep() {
-  try {
-    const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    const ctx = new AC();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.frequency.value = 880;
-    gain.gain.value = 0.3;
-    osc.connect(gain).connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.4);
-    osc.onended = () => ctx.close();
-  } catch {
-    // No sound; the screen still says 時間到.
-  }
-}
-
 const leftOf = (t: TimerState, now: number) => (t.endsAt === null ? t.leftWhenPaused : Math.max(0, t.endsAt - now));
 const clock = (ms: number) => {
   const s = Math.ceil(ms / 1000);
@@ -339,7 +321,6 @@ const clock = (ms: number) => {
 // The countdown at the top right of the lesson screen.
 export function TimerDisplay({ timer, onChange, onClose }: { timer: TimerState; onChange: (t: TimerState) => void; onClose: () => void }) {
   const [now, setNow] = useState(Date.now());
-  const beeped = useRef(false);
   useEffect(() => {
     if (timer.endsAt === null) return;
     const id = setInterval(() => setNow(Date.now()), 250);
@@ -347,30 +328,52 @@ export function TimerDisplay({ timer, onChange, onClose }: { timer: TimerState; 
   }, [timer.endsAt]);
   const left = leftOf(timer, now);
   const done = left === 0;
-  useEffect(() => {
-    if (done && !beeped.current) {
-      beeped.current = true;
-      beep();
-    }
-  }, [done]);
   const paused = timer.endsAt === null;
 
   return (
-    <div class={`timer${done ? " timer-done" : ""}`} role="timer" aria-live={done ? "assertive" : "off"}>
-      <span class="timer-clock">{done ? "時間到" : clock(left)}</span>
-      {!done && (
-        <button
-          class="btn btn-secondary btn-small"
-          onClick={() =>
-            onChange(paused ? { ...timer, endsAt: Date.now() + timer.leftWhenPaused } : { ...timer, endsAt: null, leftWhenPaused: left })
-          }
-        >
-          {paused ? "繼續" : "暫停"}
+    <>
+      {done && <TimeUp onClose={onClose} />}
+      <div class={`timer${done ? " timer-done" : ""}`} role="timer" aria-live={done ? "assertive" : "off"}>
+        <span class="timer-clock">{done ? "時間到" : clock(left)}</span>
+        {!done && (
+          <button
+            class="btn btn-secondary btn-small"
+            onClick={() =>
+              onChange(paused ? { ...timer, endsAt: Date.now() + timer.leftWhenPaused } : { ...timer, endsAt: null, leftWhenPaused: left })
+            }
+          >
+            {paused ? "繼續" : "暫停"}
+          </button>
+        )}
+        <button class="btn btn-secondary btn-small" onClick={onClose}>
+          關閉
         </button>
-      )}
-      <button class="btn btn-secondary btn-small" onClick={onClose}>
-        關閉
-      </button>
+      </div>
+    </>
+  );
+}
+
+// 時間到: silent (a beep was too shrill in class), big enough for the back row, and it
+// stays until the teacher closes it. Above everything, even an open dialog.
+function TimeUp({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    // Capture phase, so Esc closes only this and not the dialog underneath.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      onClose();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose]);
+  return (
+    <div class="timeup-overlay">
+      <div class="timeup-card" role="alertdialog" aria-label="時間到">
+        <p class="timeup-text">時間到</p>
+        <button class="btn btn-main" autoFocus onClick={onClose}>
+          知道了
+        </button>
+      </div>
     </div>
   );
 }

@@ -455,3 +455,24 @@ a.btn { text-decoration: none; }
 .timer { display: flex; align-items: center; gap: var(--space-1); margin-left: auto; padding: 4px var(--space-1) 4px var(--space-2); border: 3px solid var(--primary); border-radius: var(--radius); }
 .timer-clock { min-width: 3.2em; font-size: clamp(36px, 3.6vw, 64px); font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; text-align: center; }
 .timer-done { border-color: var(--danger); background: #fdeceb; color: var(--danger); }
+.timeup-overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: var(--space-3); background: rgba(0, 0, 0, 0.6); }
+.timeup-card { display: grid; gap: var(--space-3); justify-items: center; width: min(90vw, 900px); padding: var(--space-4); background: #fff; border-radius: var(--radius); }
+.timeup-card p { margin: 0; }
+.timeup-text { font-size: clamp(96px, 14vw, 220px); font-weight: 700; line-height: 1.1; color: var(--danger); }
+.timeup-card .btn-main { min-width: 360px; }
+
+/* 搶答: fills the lesson screen (projected). Under 時間到 (z-index 100), over dialogs. */
+.buzz-screen { position: fixed; inset: 0; z-index: 20; display: grid; grid-template-rows: 1fr auto auto auto; gap: var(--space-2); padding: var(--space-3) var(--space-4); background: var(--bg); }
+.buzz-main { display: grid; place-items: center; min-height: 0; overflow: auto; }
+.buzz-big { margin: 0; font-size: clamp(120px, 22vh, 260px); font-weight: 700; line-height: 1; }
+.buzz-countdown { color: var(--primary); font-variant-numeric: tabular-nums; }
+.buzz-ranking { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); justify-items: center; }
+.buzz-rank { display: flex; align-items: baseline; gap: 0.6em; font-weight: 700; line-height: 1.2; }
+.buzz-place { color: var(--text-muted); font-size: 0.6em; }
+.buzz-rank-1 { font-size: clamp(56px, 10vh, 120px); color: var(--primary); }
+.buzz-rank-2 { font-size: clamp(36px, 6vh, 72px); }
+.buzz-rank-3 { font-size: clamp(26px, 4vh, 48px); }
+.buzz-more { font-size: clamp(22px, 3vh, 36px); color: var(--text-muted); }
+.buzz-status { margin: 0; text-align: center; font-size: clamp(22px, 2vw, 36px); }
+.buzz-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+.buzz-actions .btn-main { min-width: 360px; }
