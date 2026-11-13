@@ -62,14 +62,19 @@ export function gradeAnswer(question: QuestionData, answer: unknown): GradeResul
 
 // The only shape of a question that may be sent to students before the
 // teacher reveals the answer: no correct option, no accepted answers.
-export type StudentQuestion = { id: string; text: string; note: string; points: number } & (
-  | { type: "truefalse" | "essay" }
-  | { type: "single" | "multiple"; options: string[] }
-  | { type: "fill"; blankCount: number }
+// quick: a 臨時出題, whose text and option texts may be empty (asked out loud).
+export type StudentQuestion = { id: string; text: string; note: string; points: number; quick?: true } & (
+  { type: "truefalse" | "essay" } | { type: "single" | "multiple"; options: string[] } | { type: "fill"; blankCount: number }
 );
 
-export function toStudentView(question: QuestionData & { id: string }): StudentQuestion {
-  const base = { id: question.id, text: question.text, note: question.note, points: question.points };
+export function toStudentView(question: QuestionData & { id: string; quick?: boolean }): StudentQuestion {
+  const base = {
+    id: question.id,
+    text: question.text,
+    note: question.note,
+    points: question.points,
+    ...(question.quick ? { quick: true as const } : {}),
+  };
   switch (question.type) {
     case "single":
     case "multiple":

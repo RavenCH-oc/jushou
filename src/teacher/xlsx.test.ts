@@ -73,10 +73,40 @@ const record: LessonRecord = {
     { id: "B", seat: 2, name: "乙", present: false },
   ],
   questions: [
-    { id: "s", type: "single", text: "單選題", note: "", points: 2, config: { options: ["x", "y"], correct: [1] }, status: "revealed" },
-    { id: "f", type: "fill", text: "填＿＿＿空", note: "", points: 2, config: { blanks: [["說", "悅"]] }, status: "closed" },
-    { id: "e", type: "essay", text: "簡答", note: "", points: 5, config: {}, status: "revealed" },
-    { id: "n", type: "truefalse", text: "沒出", note: "", points: 1, config: { answer: true }, status: "pending" },
+    {
+      id: "s",
+      type: "single",
+      text: "單選題",
+      note: "",
+      points: 2,
+      config: { options: ["x", "y"], correct: [1] },
+      status: "revealed",
+      quick: false,
+      scored: true,
+    },
+    {
+      id: "f",
+      type: "fill",
+      text: "填＿＿＿空",
+      note: "",
+      points: 2,
+      config: { blanks: [["說", "悅"]] },
+      status: "closed",
+      quick: false,
+      scored: true,
+    },
+    { id: "e", type: "essay", text: "簡答", note: "", points: 5, config: {}, status: "revealed", quick: false, scored: true },
+    {
+      id: "n",
+      type: "truefalse",
+      text: "沒出",
+      note: "",
+      points: 1,
+      config: { answer: true },
+      status: "pending",
+      quick: false,
+      scored: true,
+    },
   ],
   answers: [
     { questionId: "s", studentId: "A", answer: 1, status: "correct", score: 2, blanks: null },
@@ -124,6 +154,30 @@ describe("export sheets", () => {
       [3, 3, "丙", 1, "甲", 2, "太短"],
     ]);
     expect(sheets[0].rows).toEqual(lessonSheets({ ...reviewed, reviews: [] })[0].rows); // 成績 doesn't change
+  });
+
+  it("「不計分」 questions get no score column but stay in 每題統計 and 作答明細", () => {
+    const quick = {
+      id: "q",
+      type: "single" as const,
+      text: "",
+      note: "",
+      points: 1,
+      config: { options: ["", ""], correct: [] },
+      status: "revealed" as const,
+      quick: true,
+      scored: false,
+    };
+    const r = {
+      ...record,
+      questions: [...record.questions, quick],
+      answers: [...record.answers, { questionId: "q", studentId: "A", answer: 1, status: "wrong" as const, score: 0, blanks: null }],
+    };
+    const [scores, stats, details] = lessonSheets(r);
+    expect(scores.rows).toEqual(lessonSheets(record)[0].rows);
+    expect(stats.rows.at(-1)).toEqual([4, "單選題（不計分）", "（口頭提問）", 1, 1, null, null]);
+    expect(details.rows.at(-1)).toEqual([1, "甲", 4, "B", "不計分", null]);
+    expect(classSheets([r])[0].rows[1]).toEqual(classSheets([record])[0].rows[1]);
   });
 
   it("whole class: 總表 oldest first, absent left empty", () => {

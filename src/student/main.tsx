@@ -214,6 +214,7 @@ const RESULT_LABEL = {
   pending: "老師之後批改",
   graded: "老師已批改",
   hidden: "老師沒有公布答案",
+  unscored: "不計分",
 };
 
 // 下課: how this student did on each question of today's last lesson.

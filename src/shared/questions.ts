@@ -16,7 +16,8 @@ export function typeLabel(type: QuestionType) {
 }
 
 // Answer settings, stored as one JSON column in D1.
-export type TrueFalseConfig = { answer: boolean };
+// answer is null only for a 臨時出題 before the teacher picks one (see quick.ts).
+export type TrueFalseConfig = { answer: boolean | null };
 export type ChoiceConfig = { options: string[]; correct: number[] }; // correct = option indexes
 export type FillConfig = { blanks: string[][] }; // accepted answers for each blank
 export type EssayConfig = Record<string, never>;
@@ -117,8 +118,7 @@ export function validateQuestion(raw: unknown): { value: QuestionData } | { erro
       if (!o) {
         errors[`option-${i}`] =
           `選項 ${optionLetter(i)} 還沒有內容。` + (options.length > MIN_OPTIONS ? "不需要這個選項的話，可以按下面的「刪除」。" : "");
-      }
-      else if (o.length > MAX_OPTION_TEXT) errors[`option-${i}`] = `每個選項最多 ${MAX_OPTION_TEXT} 個字。`;
+      } else if (o.length > MAX_OPTION_TEXT) errors[`option-${i}`] = `每個選項最多 ${MAX_OPTION_TEXT} 個字。`;
     });
     const valid = correct.filter((i): i is number => Number.isInteger(i) && i >= 0 && i < options.length);
     const picked = [...new Set(valid)].sort((a, b) => a - b);

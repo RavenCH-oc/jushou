@@ -252,9 +252,12 @@ a.btn { text-decoration: none; }
 }
 /* The lesson screen uses the whole (projected) window; text grows with its width. */
 .lesson { padding: var(--space-2) 2.5vw; }
-.lesson-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); margin-bottom: var(--space-2); }
-.lesson-bar .back { margin: 0; }
-.lesson-bar .row { margin-left: auto; align-items: center; }
+/* Two rows: where we are (+ the timer, top right), then tools left and lesson controls right. */
+.lesson-bar { display: grid; gap: var(--space-1); margin-bottom: var(--space-2); }
+.lesson-head { display: flex; align-items: center; gap: var(--space-1) var(--space-2); min-height: 56px; }
+.lesson-head .back { margin: 0; }
+.lesson-tools { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-1) var(--space-2); }
+.lesson-tools .row { align-items: center; gap: var(--space-1); }
 .lesson-title { margin: 0; font-size: clamp(24px, 1.8vw, 36px); }
 .btn-main { min-height: clamp(64px, 5vw, 96px); padding: 0 var(--space-4); font-size: clamp(26px, 2vw, 40px); }
 .lesson-grid { display: grid; grid-template-columns: 20% minmax(0, 1fr); gap: var(--space-3); align-items: start; }
@@ -425,3 +428,30 @@ a.btn { text-decoration: none; }
 .peer-note { display: grid; gap: 2px; padding: var(--space-1) var(--space-2); color: var(--text-muted); font-size: var(--fs-small); border-left: 3px solid var(--border); }
 .peer-note p { margin: 0; overflow-wrap: anywhere; }
 .peer-note p:first-child { font-weight: 700; }
+
+/* 上課小工具 */
+.tag { display: inline-block; margin-left: 6px; padding: 0 6px; font-size: 0.8em; font-weight: 700; color: #7a3fb0; border: 1px solid #7a3fb0; border-radius: 4px; vertical-align: 2px; }
+.quick-types { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-1); }
+.quick-type { min-height: 72px; font-size: 24px; padding: 0 var(--space-1); }
+.stepper { display: flex; align-items: center; gap: var(--space-1); font-size: 22px; }
+.stepper-label { font-weight: 700; white-space: nowrap; }
+.stepper .muted { white-space: nowrap; }
+.stepper-button { min-width: 56px; font-size: 26px; padding: 0; }
+.stepper-value { min-width: 1.5em; text-align: center; font-size: 30px; }
+.answer-picker { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); font-size: clamp(20px, 1.5vw, 30px); }
+.answer-picker-label { font-weight: 700; }
+.answer-choice { min-width: 72px; font-size: inherit; }
+.draw-result { display: grid; place-items: center; min-height: 200px; padding: var(--space-2); text-align: center; background: var(--bg-soft); border-radius: var(--radius); }
+.draw-result p { margin: 0; }
+.draw-name { font-size: clamp(48px, 6vw, 96px); font-weight: 700; line-height: 1.2; }
+.draw-detail { font-size: clamp(24px, 2.4vw, 40px); }
+.draw-spinning .draw-name { color: var(--text-muted); }
+.draw-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-1); }
+.check { display: flex; align-items: center; gap: var(--space-1); margin: 0; min-height: 48px; }
+.check input { width: 24px; height: 24px; }
+.notice-text { margin: 0; font-weight: 700; color: #b26a00; }
+.timer-presets { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-1); }
+.timer-preset { min-height: 64px; font-size: 24px; }
+.timer { display: flex; align-items: center; gap: var(--space-1); margin-left: auto; padding: 4px var(--space-1) 4px var(--space-2); border: 3px solid var(--primary); border-radius: var(--radius); }
+.timer-clock { min-width: 3.2em; font-size: clamp(36px, 3.6vw, 64px); font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; text-align: center; }
+.timer-done { border-color: var(--danger); background: #fdeceb; color: var(--danger); }

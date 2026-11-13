@@ -23,6 +23,8 @@ export type QuestionStats = {
 
 export type LessonQuestion = Question & {
   status: QuestionStatus;
+  quick: boolean; // 臨時出題
+  scored: boolean; // false once revealed as 「這題不計分」
   answeredBy: string[];
   stats: QuestionStats;
   review?: { done: number; total: number }; // 簡答 that had 互評: how many have sent theirs
@@ -64,7 +66,7 @@ export type StudentCurrent = {
   total: number;
   status: "open" | "closed" | "reviewing" | "revealed";
   answer: Answer | null; // what this student last sent
-  reveal?: { result: GradeResult; question: Question }; // only once the teacher reveals it
+  reveal?: { result: GradeResult; question: Question; unscored?: true }; // only once the teacher reveals it
   // While reviewing: the answer this student should review, or null if they have none
   // (didn't answer). Only the answer text: nothing about who wrote it.
   review?: ReviewTask | null;
@@ -85,7 +87,7 @@ export type ReviewTask = {
 export type LessonResultItem = {
   number: number;
   snippet: string; // first 20 characters of the question
-  result: GradeResult["status"] | "hidden";
+  result: GradeResult["status"] | "hidden" | "unscored";
   score: number | null;
 };
 

@@ -51,3 +51,7 @@
 
 .qv-blank-field { display: grid; gap: 4px; margin: 0; }
 .qv-essay { min-height: 180px; padding: var(--space-2); line-height: 1.6; resize: vertical; }
+
+/* 臨時出題: options without text are just a big letter, full row. */
+.qv-letter-only { justify-content: center; min-height: 64px; font-size: 32px; font-weight: 700; text-align: center; }
+.qv-letter-only.qv-on { color: var(--primary); }

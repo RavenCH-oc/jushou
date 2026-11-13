@@ -6,6 +6,7 @@
 import type { Answer, GradeResult } from "./grading";
 import { optionLetter, typeLabel, type Question } from "./questions";
 import type { QuestionStats, QuestionStatus } from "./lesson";
+import { ORAL_LABEL } from "./quick";
 
 // --- What the API sends ---
 
@@ -22,7 +23,8 @@ export type LessonSummary = {
   ungraded: number; // 簡答 answers not graded yet
 };
 
-export type RecordQuestion = Question & { status: QuestionStatus };
+// quick: 臨時出題. scored false: 「這題不計分」, left out of every score (see countedQuestions).
+export type RecordQuestion = Question & { status: QuestionStatus; quick: boolean; scored: boolean };
 
 export type RecordAnswerRow = {
   questionId: string;
@@ -82,18 +84,25 @@ export function askedQuestions(r: { questions: RecordQuestion[] }) {
   return r.questions.filter((q) => q.status !== "pending");
 }
 
-// 滿分: points of every asked question, 簡答 included.
+// Questions that count toward scores: asked, and not 「這題不計分」. Unscored ones still
+// show their answers in 每題統計 and 題目詳情, but no 正確率 and no score anywhere.
+export function countedQuestions(questions: RecordQuestion[]) {
+  return questions.filter((q) => q.scored);
+}
+
+// 滿分: points of every counted question, 簡答 included.
 export function maxScore(questions: RecordQuestion[]) {
   return questions.reduce((sum, q) => sum + q.points, 0);
 }
 
 export type Cell =
-  | { kind: "absent"; score: null }
+  | { kind: "absent" | "unscored"; score: null }
   | { kind: "unanswered" | "ungraded"; score: 0 } // 沒作答 and not-yet-graded 簡答 count as 0
   | { kind: "correct" | "wrong" | "graded"; score: number };
 
-export function cellOf(answer: RecordAnswer | undefined, present: boolean): Cell {
+export function cellOf(answer: RecordAnswer | undefined, present: boolean, scored = true): Cell {
   if (!present) return { kind: "absent", score: null };
+  if (!scored) return { kind: "unscored", score: null };
   if (!answer || answer.status === "unanswered") return { kind: "unanswered", score: 0 };
   if (answer.status === "pending") return { kind: "ungraded", score: 0 };
   return { kind: answer.status, score: answer.score ?? 0 };
@@ -104,12 +113,12 @@ const key = (questionId: string, studentId: string) => `${questionId} ${studentI
 // Everything one record page needs, computed once.
 export function analyze(r: LessonRecord) {
   const asked = askedQuestions(r);
-  const max = maxScore(asked);
+  const max = maxScore(countedQuestions(asked));
   const byKey = new Map(r.answers.map((a) => [key(a.questionId, a.studentId), a]));
   const answerOf = (q: RecordQuestion, studentId: string) => byKey.get(key(q.id, studentId));
 
   const students = r.students.map((s) => {
-    const cells = asked.map((q) => cellOf(answerOf(q, s.id), s.present));
+    const cells = asked.map((q) => cellOf(answerOf(q, s.id), s.present, q.scored));
     return {
       ...s,
       cells,
@@ -121,7 +130,7 @@ export function analyze(r: LessonRecord) {
 
   const questions = asked.map((q, i) => {
     const cells = present.map((s) => s.cells[i]);
-    const answered = cells.filter((c) => c.kind !== "unanswered").length;
+    const answered = present.filter((s) => answerOf(q, s.id)).length;
     const correct = cells.filter((c) => c.kind === "correct").length;
     // 簡答 average: graded answers, with 沒作答 as 0; nothing to show until one is graded.
     const graded = cells.some((c) => c.kind === "graded") ? cells.filter((c) => c.kind === "graded" || c.kind === "unanswered") : [];
@@ -132,7 +141,7 @@ export function analyze(r: LessonRecord) {
       correct,
       ungraded: cells.filter((c) => c.kind === "ungraded").length,
       // 正確率 = 答對 ÷ 出席 (沒作答 counts as wrong); 簡答 shows the average instead.
-      rate: q.type === "essay" ? null : ratio(correct, present.length),
+      rate: q.type === "essay" || !q.scored ? null : ratio(correct, present.length),
       average: q.type === "essay" ? average(graded.map((c) => c.score ?? 0)) : null,
     };
   });
@@ -268,11 +277,12 @@ export const RESULT_WORD: Record<Cell["kind"], string> = {
   wrong: "答錯",
   ungraded: "未批改",
   graded: "已批改",
+  unscored: "不計分",
 };
 
 // One cell of the 學生成績 table: ○／✕／— or the 簡答 score.
 export function cellMark(q: Question, c: Cell) {
-  if (c.kind === "absent") return "";
+  if (c.kind === "absent" || c.kind === "unscored") return "";
   if (c.kind === "unanswered") return "—";
   if (c.kind === "correct") return "○";
   if (c.kind === "wrong") return "✕";
@@ -282,6 +292,7 @@ export function cellMark(q: Question, c: Cell) {
 
 export function questionSnippet(text: string, length = 20) {
   const line = text.replace(/\s+/g, " ").trim();
+  if (!line) return ORAL_LABEL; // 臨時出題 asked out loud
   return line.length > length ? `${line.slice(0, length)}…` : line;
 }
 

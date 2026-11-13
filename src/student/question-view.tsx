@@ -8,23 +8,29 @@ import { optionLetter, typeLabel } from "../shared/questions";
 
 type Props = {
   q: StudentQuestion;
+  oral?: string; // what a 臨時出題 without text says instead (see QuestionText)
   number?: number;
   answer?: Answer;
   onAnswer?: (a: Answer) => void;
 };
 
-export function QuestionView({ q, number, answer, onAnswer = () => {} }: Props) {
+export function QuestionView({ q, oral, number, answer, onAnswer = () => {} }: Props) {
   return (
     <article class="qv">
       <p class="qv-meta">
         {number !== undefined && <strong>第 {number} 題　</strong>}
         {typeLabel(q.type)}・{q.points} 分
       </p>
-      <QuestionText q={q} />
+      <QuestionText q={q} oral={oral} />
       {q.note && <p class="qv-note">{q.note}</p>}
       {q.type === "truefalse" && <TrueFalse value={answer as boolean | undefined} onChange={onAnswer} />}
       {q.type === "single" && (
-        <Options options={q.options} picked={typeof answer === "number" ? [answer] : []} onPick={(i) => onAnswer(i)} />
+        <Options
+          options={q.options}
+          picked={typeof answer === "number" ? [answer] : []}
+          onPick={(i) => onAnswer(i)}
+          lettersOnly={q.quick}
+        />
       )}
       {q.type === "multiple" && (
         <>
@@ -55,8 +61,9 @@ export function QuestionView({ q, number, answer, onAnswer = () => {} }: Props) 
 }
 
 // Fill-in text shows each blank as a numbered box, matching the inputs below.
-export function QuestionText({ q }: { q: StudentQuestion }) {
-  if (!q.text) return <p class="qv-text qv-empty">（題目文字）</p>;
+// A 臨時出題 may have no text: the teacher says it out loud or writes it on the board.
+export function QuestionText({ q, oral = "請看投影或聽老師說明" }: { q: StudentQuestion; oral?: string }) {
+  if (!q.text) return <p class="qv-text qv-empty">{q.quick ? oral : "（題目文字）"}</p>;
   if (q.type !== "fill") return <p class="qv-text">{q.text}</p>;
   const parts = q.text.split(/＿{3,}/);
   return (
@@ -75,7 +82,13 @@ function TrueFalse({ value, onChange }: { value?: boolean; onChange: (v: boolean
   return (
     <div class="qv-tf">
       {[true, false].map((v) => (
-        <button key={String(v)} type="button" class={`qv-option${value === v ? " qv-on" : ""}`} aria-pressed={value === v} onClick={() => onChange(v)}>
+        <button
+          key={String(v)}
+          type="button"
+          class={`qv-option${value === v ? " qv-on" : ""}`}
+          aria-pressed={value === v}
+          onClick={() => onChange(v)}
+        >
           <span class="qv-mark">{v ? "○" : "✕"}</span>
           {v ? "對" : "錯"}
         </button>
@@ -84,11 +97,25 @@ function TrueFalse({ value, onChange }: { value?: boolean; onChange: (v: boolean
   );
 }
 
-function Options(props: { options: string[]; picked: number[]; multiple?: boolean; onPick: (i: number) => void }) {
+// lettersOnly: a 臨時出題's options have no text, so each is just a big A, B, C…
+function Options(props: { options: string[]; picked: number[]; multiple?: boolean; lettersOnly?: boolean; onPick: (i: number) => void }) {
   return (
-    <div class="qv-options">
+    <div class={`qv-options${props.lettersOnly ? " qv-letters" : ""}`}>
       {props.options.map((text, i) => {
         const on = props.picked.includes(i);
+        if (props.lettersOnly && !text) {
+          return (
+            <button
+              key={i}
+              type="button"
+              class={`qv-option qv-letter-only${on ? " qv-on" : ""}`}
+              aria-pressed={on}
+              onClick={() => props.onPick(i)}
+            >
+              {optionLetter(i)}
+            </button>
+          );
+        }
         return (
           <button key={i} type="button" class={`qv-option${on ? " qv-on" : ""}`} aria-pressed={on} onClick={() => props.onPick(i)}>
             <span class="qv-letter">{props.multiple ? (on ? "☑" : "☐") : optionLetter(i)}</span>
