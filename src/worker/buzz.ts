@@ -27,16 +27,14 @@ export function clearBuzz(db: D1Database, lessonId: string) {
   ];
 }
 
-// 搶答 and 再搶一次: a new round. Whatever the students were answering stops (like
-// 臨時出題; the page asks before ending 互評).
+// 搶答 and 再搶一次: a new round. Questions are left exactly as they are: 搶答 is a quick
+// aside, and a question being answered (or reviewed) carries on underneath.
 app.post("/lessons/:id/buzz", async (c) => {
   const db = c.env.DB;
   const lesson = await findLesson(db, c.req.param("id"));
   if (!lesson) return fail(c, LESSON_GONE, 404);
   if (lesson.status !== "active") return fail(c, "這堂課已經結束了。", 409);
   await db.batch([
-    db.prepare("UPDATE lesson_questions SET status = 'closed' WHERE lesson_id = ? AND status = 'open'").bind(lesson.id),
-    db.prepare("UPDATE lesson_questions SET status = 'revealed' WHERE lesson_id = ? AND status = 'reviewing'").bind(lesson.id),
     db.prepare("DELETE FROM buzzes WHERE lesson_id = ?").bind(lesson.id),
     db
       .prepare("UPDATE lessons SET buzz_round = buzz_round + 1, buzz_open = 1, buzz_opens_at = ? WHERE id = ?")

@@ -99,9 +99,6 @@ function Classroom({ code, onLeave }: { code: string; onLeave: (message?: string
   const [error, setError] = useState("");
   const sawLesson = useRef(false);
   const latest = useRef(0);
-  // What was typed but not sent, per question. If the teacher stops the question (e.g. by
-  // starting 搶答) the stopped screen still shows it instead of it vanishing.
-  const drafts = useRef(new Map<string, Answer>());
 
   const refresh = useCallback(async () => {
     const ticket = ++latest.current;
@@ -172,15 +169,9 @@ function Classroom({ code, onLeave }: { code: string; onLeave: (message?: string
           {state.me.seat} 號 {state.me.name}
         </p>
         {current.status === "open" ? (
-          <Answering
-            key={current.question.id}
-            code={code}
-            current={current}
-            onRefresh={refresh}
-            onDraft={(a) => drafts.current.set(current.question.id, a)}
-          />
+          <Answering key={current.question.id} code={code} current={current} onRefresh={refresh} />
         ) : current.status === "closed" ? (
-          <Stopped current={current} draft={drafts.current.get(current.question.id)} />
+          <Stopped current={current} />
         ) : current.status === "reviewing" ? (
           <Reviewing key={current.question.id} code={code} current={current} onRefresh={refresh} />
         ) : (
@@ -198,7 +189,8 @@ function Classroom({ code, onLeave }: { code: string; onLeave: (message?: string
           {error}
         </p>
       )}
-      {/* 搶答 covers the screen without unmounting it, so a half-written answer survives. */}
+      {/* 搶答 covers the screen without unmounting it, so a half-written answer is still
+          there (and can still be sent) when the round ends. */}
       <div hidden={!!state.buzz}>{screen}</div>
       {state.buzz && <BuzzView key={state.buzz.round} code={code} buzz={state.buzz} onRefresh={refresh} />}
       <OfflineNote connected={connected} />
@@ -324,13 +316,8 @@ function isEmpty(a: Answer | undefined | null) {
   return false;
 }
 
-function Answering(props: { code: string; current: StudentCurrent; onRefresh: () => void; onDraft: (a: Answer) => void }) {
-  const { code, current, onRefresh } = props;
-  const [draft, setDraftState] = useState<Answer | undefined>(current.answer ?? undefined);
-  const setDraft = (a: Answer) => {
-    setDraftState(a);
-    props.onDraft(a);
-  };
+function Answering({ code, current, onRefresh }: { code: string; current: StudentCurrent; onRefresh: () => void }) {
+  const [draft, setDraft] = useState<Answer | undefined>(current.answer ?? undefined);
   const [sent, setSent] = useState(current.answer === null ? null : JSON.stringify(current.answer));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -372,19 +359,10 @@ function Answering(props: { code: string; current: StudentCurrent; onRefresh: ()
   );
 }
 
-function Stopped({ current, draft }: { current: StudentCurrent; draft?: Answer }) {
-  const unsent = draft !== undefined && !isEmpty(draft) && JSON.stringify(draft) !== JSON.stringify(current.answer);
+function Stopped({ current }: { current: StudentCurrent }) {
   return (
     <div class="stack">
       <p class="big-status">老師已停止作答</p>
-      {unsent && (
-        <div class="unsent">
-          <p class="muted">你還沒送出的內容（沒有送出，不會計分）：</p>
-          <fieldset class="locked" disabled>
-            <QuestionView q={current.question} answer={draft} />
-          </fieldset>
-        </div>
-      )}
       <p class="muted">{current.answer === null ? "你這題沒有作答。" : "你送出的答案："}</p>
       <fieldset class="locked" disabled>
         <QuestionView q={current.question} number={current.number} answer={current.answer ?? undefined} />

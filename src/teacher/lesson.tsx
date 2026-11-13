@@ -225,14 +225,13 @@ export function LessonPage({ id }: { id: string }) {
     }
   };
 
-  // 搶答 starts a round right away; like 臨時出題 it stops what students were answering.
+  // 搶答 starts a round right away and leaves the questions as they are.
   const startBuzz = async () => {
     await api("POST", `/lessons/${lesson.id}/buzz`);
     setDialog(null);
     await load();
   };
-  const onBuzz = () =>
-    left > 0 ? setDialog({ kind: "end-review", left, label: "結束互評，開始搶答", run: startBuzz }) : action.run(startBuzz);
+  const onBuzz = () => action.run(startBuzz);
 
   const next = questions[index + 1];
   let main: { label: string; run: () => void; disabled?: boolean };

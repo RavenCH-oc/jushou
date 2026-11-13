@@ -160,4 +160,3 @@
 .buzz-go:disabled { opacity: 0.7; }
 .buzz-rank { margin: var(--space-3) 0; font-size: 32px; font-weight: 700; }
 .buzz-rank strong { font-size: 96px; color: var(--primary); }
-.unsent { padding: var(--space-2); border: 2px dashed var(--border); border-radius: var(--radius); }

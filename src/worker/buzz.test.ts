@@ -49,7 +49,8 @@ function phone(code: string) {
     state: () => send<StudentState>("GET", "/state"),
     bind: (seat: number) => send("POST", "/bind", { seat }),
     answer: (questionId: string, answer: unknown) => send("POST", "/answer", { questionId, answer }),
-    buzz: (round?: number) => send<{ rank: number }>("POST", "/buzz", round === undefined ? {} : { round }),
+    buzz: (round = 1) => send<{ rank: number }>("POST", "/buzz", { round }),
+    raw: (body: unknown) => send<{ rank: number }>("POST", "/buzz", body),
   };
 }
 
@@ -140,19 +141,61 @@ describe("搶答", () => {
     const b = await board();
     expect(b).toMatchObject({ round: 2, count: 0, top: [] });
     expect((await phones[1].state()).data.buzz).toMatchObject({ round: 2, rank: null });
-    expect((await phones[1].buzz()).data.rank).toBe(1);
+    expect((await phones[1].buzz(2)).data.rank).toBe(1);
   });
 
-  it("starting stops the question being answered", async () => {
+  it("leaves questions alone: an open one stays open and can still be answered afterwards", async () => {
     const { question, phones, start, id } = await lesson(2);
     await teacher("POST", `/lesson-questions/${question.id}/open`);
     await phones[0].answer(question.id, true);
     await start();
+    let live = (await teacher<LessonDetail>("GET", `/lessons/${id}`)).data;
+    expect(live.questions[0].status).toBe("open");
+    // Underneath the 搶答 screen the phone still has the question open.
+    expect((await phones[1].state()).data.current?.status).toBe("open");
+    await phones[1].buzz();
+    await teacher("POST", `/lessons/${id}/buzz/end`);
+    expect((await phones[1].answer(question.id, false)).status).toBe(200);
+    live = (await teacher<LessonDetail>("GET", `/lessons/${id}`)).data;
+    expect(live.questions[0]).toMatchObject({ status: "open", stats: { answered: 2 } });
+  });
+
+  it("doesn't end 互評 either", async () => {
+    const { phones, start, id } = await lesson(2);
+    const { data: q } = await teacher<{ id: string }>("POST", `/lessons/${id}/quick`, { type: "essay" });
+    await phones[0].answer(q.id, "甲");
+    await phones[1].answer(q.id, "乙");
+    await teacher("POST", `/lesson-questions/${q.id}/close`);
+    await teacher("POST", `/lesson-questions/${q.id}/review`);
+    await start();
     const live = (await teacher<LessonDetail>("GET", `/lessons/${id}`)).data;
-    expect(live.questions[0].status).toBe("closed");
-    expect(live.questions[0].stats.answered).toBe(1);
-    // The phone still has its question underneath the 搶答 screen.
-    expect((await phones[1].state()).data.current?.status).toBe("closed");
+    expect(live.questions.find((x) => x.id === q.id)?.status).toBe("reviewing");
+    expect((await phones[0].state()).data.current?.review).toBeTruthy();
+  });
+
+  it("a late press from the previous round can't land in the new one", async () => {
+    const { phones, board, start } = await lesson(2);
+    await start();
+    await phones[0].buzz(1);
+    await start(); // 再搶一次 while 學生2's press for round 1 is still on its way
+    const stale = await phones[1].buzz(1);
+    expect(stale.status).toBe(409);
+    expect(stale.data.error).toBe("這一輪搶答已經結束了。");
+    expect((await board()).count).toBe(0);
+    // Round 2 still works for everyone.
+    expect((await phones[1].buzz(2)).data.rank).toBe(1);
+    expect((await phones[0].buzz(2)).data.rank).toBe(2);
+    expect((await phones[0].buzz(2)).data.rank).toBe(2); // again: same place
+  });
+
+  it("needs the round", async () => {
+    const { phones, start } = await lesson(1);
+    await start();
+    for (const body of [{}, { round: "1" }, { round: 1.5 }]) {
+      const res = await phones[0].raw(body);
+      expect(res.status, JSON.stringify(body)).toBe(400);
+      expect(res.data.error).toBe("請重新整理畫面再按一次。");
+    }
   });
 
   it("a press tells only the teacher; start and end tell everyone", async () => {

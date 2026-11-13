@@ -279,7 +279,7 @@ app.post("/review/:code", async (c) => {
   return c.json({ ok: true });
 });
 
-// 搶！ Body: { round } (optional). The place is the order the server gets presses in;
+// 搶！ Body: { round }. The place is the order the server gets presses in;
 // pressing again just gives the same place back. Only the teacher is told: the other
 // phones don't need to refetch, and this student's place is in the reply.
 app.post("/buzz/:code", async (c) => {
@@ -291,18 +291,32 @@ app.post("/buzz/:code", async (c) => {
   const lesson = await findLesson(db, cls.id);
   if (!lesson) return fail(c, "這堂課已經結束了。", 409);
   const { round } = await readBody(c);
-  if (!lesson.buzz_open || (round !== undefined && round !== lesson.buzz_round)) return fail(c, "這一輪搶答已經結束了。", 409);
-  if (Date.now() < (lesson.buzz_opens_at ?? 0)) return fail(c, "還沒開始，等倒數結束再按。", 409);
+  if (typeof round !== "number" || !Number.isInteger(round)) return fail(c, "請重新整理畫面再按一次。");
+  // The round, its open time and the insert are checked in one statement, so a late press
+  // can't slip into the next round if 再搶一次 happens in between.
   const [added, mine] = await db.batch([
-    db.prepare("INSERT OR IGNORE INTO buzzes (lesson_id, student_id) VALUES (?, ?)").bind(lesson.id, me.id),
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO buzzes (lesson_id, student_id)
+         SELECT id, ? FROM lessons WHERE id = ? AND buzz_open = 1 AND buzz_round = ? AND buzz_opens_at <= ?`,
+      )
+      .bind(me.id, lesson.id, round, Date.now()),
     db
       .prepare(
         "SELECT (SELECT COUNT(*) FROM buzzes x WHERE x.lesson_id = b.lesson_id AND x.seq <= b.seq) AS rank FROM buzzes b WHERE b.lesson_id = ? AND b.student_id = ?",
       )
       .bind(lesson.id, me.id),
   ]);
+  const rank = (mine.results[0] as { rank: number } | undefined)?.rank;
   if (added.meta.changes) await notify(c.env, lesson.id, "buzz", "teacher");
-  return c.json({ rank: (mine.results[0] as { rank: number }).rank });
+  else if (rank === undefined || round !== lesson.buzz_round) {
+    // Not recorded and not an earlier press of this round: say why.
+    const now = await findLesson(db, cls.id);
+    if (now?.buzz_open && now.buzz_round === round && Date.now() < (now.buzz_opens_at ?? 0))
+      return fail(c, "還沒開始，等倒數結束再按。", 409);
+    return fail(c, "這一輪搶答已經結束了。", 409);
+  }
+  return c.json({ rank });
 });
 
 // Body: { questionId, answer }. Graded here, never trusting the phone. Sending again replaces it.
