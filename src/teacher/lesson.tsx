@@ -8,9 +8,11 @@ import { OfflineNote, useLive } from "../student/live";
 import { QuestionText, QuestionView } from "../student/question-view";
 import { toStudentView } from "../shared/grading";
 import { optionLetter, typeLabel, type Question } from "../shared/questions";
+import type { LiveEvent } from "../shared/lesson";
 import type { ActiveLesson, EssayAnswer, LessonDetail, LessonQuestion, PeerReviewItem, QuestionStats } from "../shared/lesson";
 import type { ClassSummary, QuestionSetSummary } from "../shared/types";
 import { ORAL_LABEL } from "../shared/quick";
+import { BuzzScreen } from "./buzz";
 import { PickerDialog, QuickDialog, TimerDialog, TimerDisplay, type QuickRequest, type TimerState } from "./tools";
 
 // --- Start a lesson ---
@@ -153,9 +155,19 @@ export function LessonPage({ id }: { id: string }) {
 
   // Many answers arrive at once; refetch at most about twice a second.
   const timer = useRef(0);
-  const onChange = useCallback(() => {
+  const reload = useCallback(() => {
     if (!timer.current) timer.current = setTimeout(() => ((timer.current = 0), load()), 400);
   }, [load]);
+  // 搶答 presses only refresh the light ranking on the 搶答 screen, never the whole lesson.
+  const buzzOpen = !!lesson?.buzzOpen;
+  const pokeBuzz = useRef<() => void>(() => {});
+  const onChange = useCallback(
+    (t: LiveEvent | "sync") => {
+      if (t === "buzz" && buzzOpen) pokeBuzz.current();
+      else reload();
+    },
+    [reload, buzzOpen],
+  );
   const connected = useLive(lesson?.status === "active" ? id : null, "teacher", onChange);
 
   // Follow the question the students see whenever it changes.
@@ -213,6 +225,14 @@ export function LessonPage({ id }: { id: string }) {
     }
   };
 
+  // 搶答 starts a round right away and leaves the questions as they are.
+  const startBuzz = async () => {
+    await api("POST", `/lessons/${lesson.id}/buzz`);
+    setDialog(null);
+    await load();
+  };
+  const onBuzz = () => action.run(startBuzz);
+
   const next = questions[index + 1];
   let main: { label: string; run: () => void; disabled?: boolean };
   const extra: { label: string; run: () => void }[] = [];
@@ -267,6 +287,9 @@ export function LessonPage({ id }: { id: string }) {
             </button>
             <button class="btn btn-secondary" onClick={() => setDialog({ kind: "picker" })}>
               抽人
+            </button>
+            <button class="btn btn-secondary" onClick={onBuzz}>
+              搶答
             </button>
             <button class="btn btn-secondary" onClick={() => setDialog({ kind: "timer" })}>
               計時器
@@ -368,6 +391,16 @@ export function LessonPage({ id }: { id: string }) {
         </div>
       )}
       <OfflineNote connected={connected} />
+      {lesson.buzzOpen && (
+        <BuzzScreen
+          lessonId={lesson.id}
+          poke={pokeBuzz}
+          onEnd={async () => {
+            await api("POST", `/lessons/${lesson.id}/buzz/end`);
+            await load();
+          }}
+        />
+      )}
 
       {dialog?.kind === "join" && (
         <Modal title="加入碼" full onClose={close}>

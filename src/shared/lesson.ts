@@ -8,7 +8,9 @@ export type QuestionStatus = "pending" | "open" | "closed" | "reviewing" | "reve
 
 // What the live connection says. It never carries data: on any event the
 // page fetches the current state again over HTTP.
-export type LiveEvent = "question" | "answers" | "roster" | "ended";
+// "buzz": 搶答 changed. Sent to everyone when a round starts or ends, and only to the
+// teacher when a student presses (30 phones refetching on every press would be too many requests).
+export type LiveEvent = "question" | "answers" | "roster" | "ended" | "buzz";
 
 // --- Teacher ---
 
@@ -42,6 +44,17 @@ export type LessonDetail = {
   currentQuestionId: string | null;
   students: LessonStudent[];
   questions: LessonQuestion[];
+  buzzOpen: boolean; // a 搶答 round is on
+};
+
+// The teacher's 搶答 screen: a light request, fetched on every "buzz" event.
+export type BuzzBoard = {
+  open: boolean;
+  round: number;
+  opensInMs: number; // until 「搶！」 opens; 0 once open. Counted by the server, never a clock time.
+  top: { seat: number; name: string }[]; // first 5, in the order the server got them
+  count: number; // how many pressed
+  joined: number;
 };
 
 export type EssayAnswer = { seat: number; name: string; text: string };
@@ -105,4 +118,6 @@ export type StudentState = {
   seats?: SeatChoice[]; // only while `me` is null
   current: StudentCurrent | null; // the question the teacher pushed last
   result?: LessonResult | null; // no lesson now: this student's results of today's last lesson
+  // While a 搶答 round is on (and this phone is bound): only this student's own place.
+  buzz?: { round: number; opensInMs: number; rank: number | null };
 };

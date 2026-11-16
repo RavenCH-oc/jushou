@@ -140,3 +140,23 @@
 .review-received .review-received-comment { margin-top: var(--space-1); white-space: pre-wrap; overflow-wrap: anywhere; }
 .review-received { margin-bottom: var(--space-1); }
 .review-received .review-received-score .muted { font-size: 20px; font-weight: 400; }
+
+/* 搶答 */
+.buzz-count { margin: 0; font-size: 120px; font-weight: 700; line-height: 1; color: var(--primary); }
+.buzz-button {
+  width: 100%;
+  min-height: 200px;
+  font: inherit;
+  font-size: 64px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--danger);
+  border: 0;
+  border-radius: 24px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.buzz-button:disabled { background: #c7cad1; color: #fff; cursor: default; }
+.buzz-go:disabled { opacity: 0.7; }
+.buzz-rank { margin: var(--space-3) 0; font-size: 32px; font-weight: 700; }
+.buzz-rank strong { font-size: 96px; color: var(--primary); }

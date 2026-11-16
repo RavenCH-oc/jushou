@@ -40,9 +40,9 @@ function findMe(db: D1Database, classId: string, hash: string | null) {
 
 function findLesson(db: D1Database, classId: string) {
   return db
-    .prepare("SELECT id, current_question_id FROM lessons WHERE class_id = ? AND status = 'active'")
+    .prepare("SELECT id, current_question_id, buzz_round, buzz_open, buzz_opens_at FROM lessons WHERE class_id = ? AND status = 'active'")
     .bind(classId)
-    .first<{ id: string; current_question_id: string | null }>();
+    .first<{ id: string; current_question_id: string | null; buzz_round: number; buzz_open: number; buzz_opens_at: number | null }>();
 }
 
 async function current(db: D1Database, lessonId: string, questionId: string, me: Me): Promise<StudentCurrent | null> {
@@ -181,6 +181,17 @@ app.get("/state/:code", async (c) => {
       .run();
     if (joined.meta.changes) await notify(c.env, lesson.id, "roster", "teacher");
     if (lesson.current_question_id) state.current = await current(db, lesson.id, lesson.current_question_id, me);
+    if (lesson.buzz_open) {
+      const mine = await db
+        .prepare(
+          "SELECT (SELECT COUNT(*) FROM buzzes x WHERE x.lesson_id = b.lesson_id AND x.seq <= b.seq) AS rank FROM buzzes b WHERE b.lesson_id = ? AND b.student_id = ?",
+        )
+        .bind(lesson.id, me.id)
+        .first<{ rank: number }>();
+      // Time left, not a clock time: the phone's own clock may be off.
+      const opensInMs = Math.max(0, (lesson.buzz_opens_at ?? 0) - Date.now());
+      state.buzz = { round: lesson.buzz_round, opensInMs, rank: mine?.rank ?? null };
+    }
   } else {
     state.result = await todaysResult(db, cls.id, me);
   }
@@ -266,6 +277,46 @@ app.post("/review/:code", async (c) => {
     .run();
   await notify(c.env, lesson.id, "answers", "teacher");
   return c.json({ ok: true });
+});
+
+// 搶！ Body: { round }. The place is the order the server gets presses in;
+// pressing again just gives the same place back. Only the teacher is told: the other
+// phones don't need to refetch, and this student's place is in the reply.
+app.post("/buzz/:code", async (c) => {
+  const db = c.env.DB;
+  const cls = await findClass(db, c.req.param("code"));
+  if (!cls) return fail(c, NO_CODE, 404);
+  const me = await findMe(db, cls.id, await deviceHash(c));
+  if (!me) return fail(c, NOT_ME, 403);
+  const lesson = await findLesson(db, cls.id);
+  if (!lesson) return fail(c, "這堂課已經結束了。", 409);
+  const { round } = await readBody(c);
+  if (typeof round !== "number" || !Number.isInteger(round)) return fail(c, "請重新整理畫面再按一次。");
+  // The round, its open time and the insert are checked in one statement, so a late press
+  // can't slip into the next round if 再搶一次 happens in between.
+  const [added, mine] = await db.batch([
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO buzzes (lesson_id, student_id)
+         SELECT id, ? FROM lessons WHERE id = ? AND buzz_open = 1 AND buzz_round = ? AND buzz_opens_at <= ?`,
+      )
+      .bind(me.id, lesson.id, round, Date.now()),
+    db
+      .prepare(
+        "SELECT (SELECT COUNT(*) FROM buzzes x WHERE x.lesson_id = b.lesson_id AND x.seq <= b.seq) AS rank FROM buzzes b WHERE b.lesson_id = ? AND b.student_id = ?",
+      )
+      .bind(lesson.id, me.id),
+  ]);
+  const rank = (mine.results[0] as { rank: number } | undefined)?.rank;
+  if (added.meta.changes) await notify(c.env, lesson.id, "buzz", "teacher");
+  else if (rank === undefined || round !== lesson.buzz_round) {
+    // Not recorded and not an earlier press of this round: say why.
+    const now = await findLesson(db, cls.id);
+    if (now?.buzz_open && now.buzz_round === round && Date.now() < (now.buzz_opens_at ?? 0))
+      return fail(c, "還沒開始，等倒數結束再按。", 409);
+    return fail(c, "這一輪搶答已經結束了。", 409);
+  }
+  return c.json({ rank });
 });
 
 // Body: { questionId, answer }. Graded here, never trusting the phone. Sending again replaces it.
