@@ -124,6 +124,12 @@ p { margin: 0 0 var(--space-2); }
   color: var(--disabled-text);
   cursor: default;
 }
+/* A disabled secondary button stays lighter than an enabled one. */
+.btn-secondary:disabled, .btn-secondary:disabled:hover {
+  background: var(--surface-soft);
+  border-color: var(--border);
+  color: var(--disabled-text);
+}
 .btn-text:disabled, .btn-text:disabled:hover { background: none; color: var(--disabled-text); cursor: default; }
 
 .field {

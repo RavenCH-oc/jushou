@@ -814,7 +814,7 @@ export function StudentPage({ id }: { id: string }) {
   const attended = lessons.filter((l) => l.present).length;
   return (
     <>
-      <AppBar crumbs={[{ label: "首頁", href: href("/") }, { label: student.className, href: href(`/class/${student.classId}`) }, { label: `${student.seat} ${student.name}` }]} />
+      <AppBar crumbs={[{ label: "首頁", href: href("/") }, { label: student.className, href: href(`/class/${student.classId}`) }, { label: `${student.seat} 號 ${student.name}` }]} />
       <main class="page">
         <h1>
           {student.seat} 號 {student.name}
