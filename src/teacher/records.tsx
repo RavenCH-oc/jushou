@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "preact/hooks";
 import type { ComponentChild } from "preact";
 import { api } from "./api";
 import { go, href } from "./router";
-import { Confirm, ErrorText, Loading, Modal, useAction, useLoad } from "./ui";
+import { AppBar, Confirm, type Crumb, ErrorText, Loading, Modal, useAction, useLoad } from "./ui";
 import { AnswerBars } from "./lesson";
 import { QuestionText } from "../student/question-view";
 import { toStudentView } from "../shared/grading";
@@ -124,7 +124,7 @@ function ExportDialog({ className, list, onClose }: { className: string; list: L
   return (
     <Modal title="匯出多堂課" wide onClose={onClose}>
       <p>勾選要放進 Excel 的課。第一張工作表是總表，之後每堂課一張。</p>
-      <button class="link-button" onClick={() => setPicked(all ? new Set() : new Set(list.map((l) => l.id)))}>
+      <button class="btn-text" onClick={() => setPicked(all ? new Set() : new Set(list.map((l) => l.id)))}>
         {all ? "全部取消" : "全選"}
       </button>
       <div class="choices export-list">
@@ -211,92 +211,93 @@ export function RecordPage({ id, tab, qid }: { id: string; tab?: string; qid?: s
       const { downloadLesson } = await import("./export");
       downloadLesson(record);
     });
+  const qIndex = qid ? a.asked.findIndex((q) => q.id === qid) : -1;
+  const crumbs: Crumb[] = [
+    { label: "首頁", href: href("/") },
+    { label: record.className, href: href(`/class/${record.classId}/records`) },
+    { label: formatTaipei(record.startedAt), href: href(`/record/${id}/questions`) },
+  ];
+  if (qIndex >= 0) crumbs.push({ label: `第 ${qIndex + 1} 題` });
 
   return (
-    <main class="page">
-      {qid ? (
-        <a class="back" href={href(`/record/${id}/questions`)}>
-          ← 回每題統計
-        </a>
-      ) : (
-        <a class="back" href={href(`/class/${record.classId}/records`)}>
-          ← 回上課紀錄
-        </a>
-      )}
-      <h1>
-        {record.className}・{record.setName}・{formatTaipei(record.startedAt)}
-      </h1>
-      {!qid && (
-        <div class="record-summary">
-          <p>
-            出席{" "}
-            <strong>
-              {a.present}／{a.total}
-            </strong>
-          </p>
-          <p>
-            平均分數{" "}
-            <strong>
-              {oneDecimal(a.average)}／{a.max}
-            </strong>
-          </p>
-          {firstUngraded && (
-            <a class="badge badge-link" href={href(`/record/${id}/q/${firstUngraded.q.id}`)}>
-              還有 {a.ungraded} 份簡答沒批改
-            </a>
-          )}
-          <button class="btn record-download" disabled={exporting.busy} onClick={downloadExcel}>
-            {exporting.busy ? "準備中…" : "下載 Excel"}
-          </button>
-        </div>
-      )}
-      <ErrorText message={exporting.error} />
-
-      {qid ? (
-        <QuestionDetail record={record} a={a} qid={qid} onGraded={onGraded} />
-      ) : (
-        <>
-          <nav class="tabs">
-            {tabs.map((t) => (
-              <a
-                key={t.key}
-                class={`tab${t.key === (tab ?? "") ? " tab-active" : ""}`}
-                aria-current={t.key === (tab ?? "") ? "page" : undefined}
-                href={href(`/record/${id}${t.key ? `/${t.key}` : ""}`)}
-              >
-                {t.label}
+    <>
+      <AppBar crumbs={crumbs} />
+      <main class="page">
+        <h1>
+          {record.className}・{record.setName}・{formatTaipei(record.startedAt)}
+        </h1>
+        {!qid && (
+          <div class="record-summary">
+            <p>
+              出席{" "}
+              <strong>
+                {a.present}／{a.total}
+              </strong>
+            </p>
+            <p>
+              平均分數{" "}
+              <strong>
+                {oneDecimal(a.average)}／{a.max}
+              </strong>
+            </p>
+            {firstUngraded && (
+              <a class="badge badge-link" href={href(`/record/${id}/q/${firstUngraded.q.id}`)}>
+                還有 {a.ungraded} 份簡答沒批改
               </a>
-            ))}
-          </nav>
-          {tab === "questions" ? (
-            <QuestionTable record={record} a={a} />
-          ) : tab === "groups" && record.groupingCount > 0 ? (
-            <GroupView record={record} a={a} />
-          ) : (
-            <ScoreTable a={a} />
-          )}
-          <div class="tools">
-            <button class="btn btn-secondary" onClick={() => setConfirmDelete(true)}>
-              刪除這堂紀錄
+            )}
+            <button class="btn record-download" disabled={exporting.busy} onClick={downloadExcel}>
+              {exporting.busy ? "準備中…" : "下載 Excel"}
             </button>
           </div>
-        </>
-      )}
+        )}
+        <ErrorText message={exporting.error} />
 
-      {confirmDelete && (
-        <Confirm
-          title="刪除這堂課的紀錄？"
-          message="學生在這堂課的作答和分數都會刪除，無法復原。"
-          confirmLabel="刪除這堂紀錄"
-          danger
-          onConfirm={async () => {
-            await api("DELETE", `/records/${id}`);
-            location.replace(href(`/class/${record.classId}/records`));
-          }}
-          onClose={() => setConfirmDelete(false)}
-        />
-      )}
-    </main>
+        {qid ? (
+          <QuestionDetail record={record} a={a} qid={qid} onGraded={onGraded} />
+        ) : (
+          <>
+            <nav class="tabs">
+              {tabs.map((t) => (
+                <a
+                  key={t.key}
+                  class={`tab${t.key === (tab ?? "") ? " tab-active" : ""}`}
+                  aria-current={t.key === (tab ?? "") ? "page" : undefined}
+                  href={href(`/record/${id}${t.key ? `/${t.key}` : ""}`)}
+                >
+                  {t.label}
+                </a>
+              ))}
+            </nav>
+            {tab === "questions" ? (
+              <QuestionTable record={record} a={a} />
+            ) : tab === "groups" && record.groupingCount > 0 ? (
+              <GroupView record={record} a={a} />
+            ) : (
+              <ScoreTable a={a} />
+            )}
+            <div class="tools">
+              <button class="btn btn-secondary" onClick={() => setConfirmDelete(true)}>
+                刪除這堂紀錄
+              </button>
+            </div>
+          </>
+        )}
+
+        {confirmDelete && (
+          <Confirm
+            title="刪除這堂課的紀錄？"
+            message="學生在這堂課的作答和分數都會刪除，無法復原。"
+            confirmLabel="刪除這堂紀錄"
+            danger
+            onConfirm={async () => {
+              await api("DELETE", `/records/${id}`);
+              location.replace(href(`/class/${record.classId}/records`));
+            }}
+            onClose={() => setConfirmDelete(false)}
+          />
+        )}
+      </main>
+    </>
   );
 }
 
@@ -812,58 +813,58 @@ export function StudentPage({ id }: { id: string }) {
   const { student, lessons } = data;
   const attended = lessons.filter((l) => l.present).length;
   return (
-    <main class="page">
-      <a class="back" href={href(`/class/${student.classId}`)}>
-        ← 回{student.className}名冊
-      </a>
-      <h1>
-        {student.seat} 號 {student.name}
-      </h1>
-      <div class="record-summary">
-        <p>
-          出席{" "}
-          <strong>
-            {attended}／{lessons.length}
-          </strong>{" "}
-          堂
-        </p>
-        <p>
-          平均得分率 <strong>{percent(historyRate(lessons))}</strong>
-        </p>
-      </div>
-      {lessons.length === 0 ? (
-        <p class="muted">這個班還沒有上課紀錄。</p>
-      ) : (
-        <div class="table-wrap">
-          <table class="table records-table">
-            <thead>
-              <tr>
-                <th>日期</th>
-                <th>題組</th>
-                <th>出席</th>
-                <th>得分／滿分</th>
-                <th>得分率</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lessons.map((l) => (
-                <tr key={l.id} class={`row-link${l.present ? "" : " row-absent"}`} onClick={() => go(`/record/${l.id}`)}>
-                  <td>
-                    <a href={href(`/record/${l.id}`)}>{formatTaipei(l.startedAt)}</a>
-                  </td>
-                  <td>{l.setName}</td>
-                  <td>{l.present ? "出席" : "缺席"}</td>
-                  <td>
-                    {l.present ? `${l.score}／${l.max}` : "—"}
-                    {l.ungraded > 0 && <span class="muted">（{l.ungraded} 份簡答沒批改）</span>}
-                  </td>
-                  <td>{l.present ? percent(ratio(l.score, l.max)) : "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <>
+      <AppBar crumbs={[{ label: "首頁", href: href("/") }, { label: student.className, href: href(`/class/${student.classId}`) }, { label: `${student.seat} 號 ${student.name}` }]} />
+      <main class="page">
+        <h1>
+          {student.seat} 號 {student.name}
+        </h1>
+        <div class="record-summary">
+          <p>
+            出席{" "}
+            <strong>
+              {attended}／{lessons.length}
+            </strong>{" "}
+            堂
+          </p>
+          <p>
+            平均得分率 <strong>{percent(historyRate(lessons))}</strong>
+          </p>
         </div>
-      )}
-    </main>
+        {lessons.length === 0 ? (
+          <p class="muted">這個班還沒有上課紀錄。</p>
+        ) : (
+          <div class="table-wrap">
+            <table class="table records-table">
+              <thead>
+                <tr>
+                  <th>日期</th>
+                  <th>題組</th>
+                  <th>出席</th>
+                  <th>得分／滿分</th>
+                  <th>得分率</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lessons.map((l) => (
+                  <tr key={l.id} class={`row-link${l.present ? "" : " row-absent"}`} onClick={() => go(`/record/${l.id}`)}>
+                    <td>
+                      <a href={href(`/record/${l.id}`)}>{formatTaipei(l.startedAt)}</a>
+                    </td>
+                    <td>{l.setName}</td>
+                    <td>{l.present ? "出席" : "缺席"}</td>
+                    <td>
+                      {l.present ? `${l.score}／${l.max}` : "—"}
+                      {l.ungraded > 0 && <span class="muted">（{l.ungraded} 份簡答沒批改）</span>}
+                    </td>
+                    <td>{l.present ? percent(ratio(l.score, l.max)) : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </main>
+    </>
   );
 }

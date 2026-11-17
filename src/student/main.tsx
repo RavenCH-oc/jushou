@@ -302,7 +302,7 @@ function Waiting({ me, onNotMe }: { me: { seat: number; name: string }; onNotMe:
         {me.seat} 號 {me.name}，已加入
       </p>
       <p class="wait">等老師出題</p>
-      <button class="link-button" onClick={onNotMe}>
+      <button class="btn-text" onClick={onNotMe}>
         不是我？
       </button>
     </div>

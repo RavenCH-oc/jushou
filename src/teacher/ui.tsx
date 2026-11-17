@@ -41,8 +41,51 @@ export function ErrorText({ message }: { message: string }) {
   ) : null;
 }
 
-export function Loading({ error }: { error: string }) {
-  return <main class="page">{error ? <ErrorText message={error} /> : <p>載入中…</p>}</main>;
+// `bare`: the full-screen lesson/projection pages, which have no AppBar.
+export function Loading({ error, bare }: { error: string; bare?: boolean }) {
+  return (
+    <>
+      {!bare && <AppBar />}
+      <main class="page">{error ? <ErrorText message={error} /> : <p>載入中…</p>}</main>
+    </>
+  );
+}
+
+export type Crumb = { label: string; href?: string };
+
+// Dark bar on top of every normal teacher page: 舉手 › 首頁 › … › this page.
+// The last crumb is the current page (not a link). Narrow screens show only
+// 「‹ <parent>」. `children` go on the right (e.g. 登出).
+export function AppBar({ crumbs = [], children }: { crumbs?: Crumb[]; children?: ComponentChildren }) {
+  const parent = crumbs.length > 1 ? crumbs[crumbs.length - 2] : null;
+  return (
+    <header class="appbar">
+      <span class="appbar-name">舉手</span>
+      {crumbs.length > 0 && (
+        <nav class="crumbs" aria-label="目前位置">
+          <ol>
+            {crumbs.map((c, i) =>
+              i === crumbs.length - 1 ? (
+                <li key={i}>
+                  <span aria-current="page">{c.label}</span>
+                </li>
+              ) : (
+                <li key={i}>
+                  <a href={c.href}>{c.label}</a>
+                </li>
+              ),
+            )}
+          </ol>
+          {parent && (
+            <a class="crumb-up" href={parent.href}>
+              ‹ {parent.label}
+            </a>
+          )}
+        </nav>
+      )}
+      {children && <div class="appbar-actions">{children}</div>}
+    </header>
+  );
 }
 
 export function Modal(props: { title: string; onClose: () => void; wide?: boolean; full?: boolean; children: ComponentChildren }) {

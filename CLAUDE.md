@@ -52,6 +52,14 @@ migrations/    D1 SQL migrations（0001_xxx.sql 依序編號）
 - 錯誤訊息用白話：說發生什麼事、要怎麼辦。不要顯示錯誤碼或英文 stack
 - 所有使用者看得到的文字用**繁體中文（台灣用語）**
 
+### 樣式規則
+
+- 顏色一律用 `src/shared/base.css` 的變數，不寫死色碼
+- 框線 1px；卡片白底＋淡陰影，放在灰藍背景上
+- 按鈕三級：主要 `.btn`（每畫面一個）、次要 `.btn-secondary`、文字型 `.btn-text`
+- 狀態用「文字色＋柔和底色」成對（success／warning／danger）
+- 老師端一般頁面用 `AppBar` 麵包屑，不要再加「← 回…」連結
+
 ## 語言
 
 - 程式碼、檔名、變數、commit message：英文

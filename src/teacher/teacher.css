@@ -2,12 +2,54 @@ a.btn { text-decoration: none; }
 
 .btn-small { min-height: 44px; padding: 0 var(--space-2); }
 
-.btn-danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.btn-danger, .btn-danger:hover { background: var(--danger); border-color: var(--danger); color: var(--primary-text); }
 
 /* Teacher pages use wide screens (1366–1920px); text stays 20px. */
 .page:not(.narrow) { max-width: 1400px; }
 
-/* 「← 回…」: a big, outlined target, not a small text link. */
+/* AppBar: dark bar with breadcrumbs on normal teacher pages. Not sticky. */
+.appbar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-height: 56px;
+  padding: 0 var(--space-3);
+  background: var(--appbar);
+  color: var(--appbar-text);
+  font-size: 18px;
+  white-space: nowrap;
+}
+.appbar-name { flex: none; font-weight: 700; }
+.crumbs { display: flex; flex: 1; min-width: 0; }
+.crumbs ol { display: flex; align-items: center; min-width: 0; margin: 0; padding: 0; list-style: none; }
+.crumbs li { display: flex; align-items: center; min-width: 0; }
+.crumbs li::before { content: "›"; flex: none; padding: 0 10px; color: var(--appbar-muted); }
+.crumbs li > *, .crumb-up { overflow: hidden; text-overflow: ellipsis; max-width: 16em; }
+.crumbs li:last-child { flex-shrink: 1000; } /* shrink the current page's name first */
+.crumbs a { display: block; line-height: 44px; color: var(--appbar-muted); text-decoration: none; }
+.crumbs a:hover { color: var(--appbar-text); text-decoration: underline; }
+.crumbs [aria-current] { color: var(--appbar-text); font-weight: 700; }
+.crumbs .crumb-up { display: none; }
+.appbar a:focus-visible, .appbar-button:focus-visible { outline: 3px solid var(--appbar-text); outline-offset: 2px; }
+.appbar-actions { flex: none; display: flex; gap: var(--space-1); margin-left: auto; padding-left: var(--space-2); }
+.appbar-button {
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  font: inherit;
+  color: var(--appbar-text);
+  background: transparent;
+  border: 1px solid var(--appbar-muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.appbar-button:hover { border-color: var(--appbar-text); text-decoration: underline; }
+@media (max-width: 700px) {
+  .appbar { padding: 0 var(--space-2); }
+  .crumbs ol { display: none; }
+  .crumbs .crumb-up { display: block; margin-left: 12px; }
+}
+
+/* 「← 回首頁」on the lesson screen (other pages use the AppBar). */
 .back {
   display: inline-flex;
   align-items: center;
@@ -17,9 +59,9 @@ a.btn { text-decoration: none; }
   font-size: var(--fs-body);
   color: var(--primary);
   text-decoration: none;
-  border: 2px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  background: var(--bg);
+  background: var(--surface);
 }
 
 .topbar,
@@ -32,13 +74,14 @@ a.btn { text-decoration: none; }
   margin-bottom: var(--space-3);
 }
 .topbar h1, .section-head h2 { margin: 0; }
+.topbar-end { justify-content: flex-end; }
+.login { padding-top: 12vh; }
+.login h1 { margin: 0; }
 
 .row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: flex-end; }
 .row .grow { flex: 1; min-width: 160px; }
 .row > .field { flex: 1; min-width: 160px; }
 .stack-lg > * + * { margin-top: var(--space-3); }
-
-.ok { color: #1b6e2b; font-weight: 700; }
 
 .card-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
 .card-link {
@@ -52,7 +95,7 @@ a.btn { text-decoration: none; }
   font-size: 24px;
 }
 .card-link .muted { font-size: var(--fs-body); }
-.card-danger { border-color: var(--danger); background: #fff5f4; }
+.card-danger { border-color: var(--danger); background: var(--danger-soft); }
 
 .join-code { margin: 0; font-size: 24px; }
 .join-code strong, .join-code-big { letter-spacing: 0.15em; font-variant-numeric: tabular-nums; }
@@ -61,7 +104,7 @@ a.btn { text-decoration: none; }
 .tabs {
   display: flex;
   gap: var(--space-1);
-  border-bottom: 3px solid var(--border);
+  border-bottom: 1px solid var(--border);
   margin-bottom: var(--space-3);
   overflow-x: auto;
   overflow-y: hidden;
@@ -73,18 +116,19 @@ a.btn { text-decoration: none; }
   color: var(--text-muted);
   text-decoration: none;
   font-weight: 700;
-  border-bottom: 5px solid transparent;
-  margin-bottom: -3px;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
 }
 .tab-active { color: var(--primary); border-bottom-color: var(--primary); }
 
 .textarea { min-height: 240px; padding: var(--space-2); line-height: 1.6; resize: vertical; }
 .field-seat { width: 6em; }
 
-.table-wrap { overflow-x: auto; margin: var(--space-2) 0; }
+.table-wrap { overflow-x: auto; margin: var(--space-2) 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
 .table { width: 100%; border-collapse: collapse; }
 .table th, .table td { text-align: left; padding: var(--space-1) var(--space-2); border-bottom: 1px solid var(--border); }
-.table th { background: var(--bg-soft); }
+.table th { background: var(--surface-soft); }
+.table tr:last-child td { border-bottom: 0; }
 .table th, .table td { white-space: nowrap; }
 @media (max-width: 480px) {
   .table th, .table td { padding: var(--space-1); }
@@ -93,7 +137,7 @@ a.btn { text-decoration: none; }
 }
 .table .actions { text-align: right; white-space: nowrap; }
 .table .actions .btn + .btn { margin-left: var(--space-1); }
-.row-error td { color: var(--danger); background: #fff0ef; font-weight: 700; }
+.row-error td { color: var(--danger); background: var(--danger-soft); font-weight: 700; }
 
 .add-student { margin-top: var(--space-3); display: grid; gap: var(--space-2); justify-items: start; }
 .add-student h3 { margin: 0; }
@@ -107,14 +151,16 @@ a.btn { text-decoration: none; }
   gap: var(--space-2);
   min-height: var(--tap);
   padding: var(--space-1) var(--space-2);
-  border: 2px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
+  background: var(--surface);
   font-weight: 400;
   margin: 0;
   cursor: pointer;
 }
 .choice input { width: 22px; height: 22px; margin: 0; flex: none; }
-.choice-on { border-color: var(--primary); background: #eef2fb; }
+/* Thicker look via inset shadow, so the row doesn't move when picked. */
+.choice-on { border-color: var(--primary); background: var(--primary-soft); box-shadow: inset 0 0 0 1px var(--primary); }
 
 .group-grid {
   display: grid;
@@ -135,7 +181,7 @@ a.btn { text-decoration: none; }
 .group-name { font-weight: 700; font-size: 22px; background: none; border: 2px dashed transparent; }
 .group-name .muted { display: block; font-size: var(--fs-small); font-weight: 400; }
 .group-name:hover, .group-name:focus-visible { border-color: var(--border); }
-.member { background: var(--bg); border: 2px solid var(--border); }
+.member { background: var(--surface); border: 2px solid var(--border); }
 .member-wrap { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 .unplaced { border-style: dashed; }
 .tools { margin-top: var(--space-3); }
@@ -143,7 +189,7 @@ a.btn { text-decoration: none; }
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(15, 22, 35, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -153,8 +199,9 @@ a.btn { text-decoration: none; }
 .modal-wide { max-width: 900px !important; }
 .modal-full { max-width: 96vw !important; }
 .modal {
-  background: var(--bg);
+  background: var(--surface);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
   padding: var(--space-3);
   width: 100%;
   max-width: 420px;
@@ -197,7 +244,7 @@ a.btn { text-decoration: none; }
 
 /* Student view inside teacher pages, framed like a phone screen */
 .phone-column { max-width: 440px; }
-.phone { border: 2px solid var(--border); border-radius: 18px; padding: var(--space-2); background: var(--bg); }
+.phone { border: 2px solid var(--border); border-radius: 18px; padding: var(--space-2); background: var(--surface); }
 
 /* Question editor: form on the left, preview on the right; stacked on narrow screens */
 .editor { display: grid; gap: var(--space-4); }
@@ -217,12 +264,12 @@ a.btn { text-decoration: none; }
 .field[aria-invalid="true"] { border-color: var(--danger); }
 .field-error { margin: 4px 0 0; font-size: var(--fs-small); }
 .tf-answer { display: grid; gap: var(--space-2); }
-.option-edit { border: 2px solid var(--border); border-radius: var(--radius); padding: var(--space-1) var(--space-2); }
-.option-correct { border-color: #1b6e2b; background: #f0f8f1; }
+.option-edit { border: 2px solid var(--border); border-radius: var(--radius); padding: var(--space-1) var(--space-2); background: var(--surface); }
+.option-correct { border-color: var(--success); background: var(--success-soft); }
 .option-main { display: flex; gap: var(--space-1); align-items: center; }
 .option-letter { flex: none; width: 2em; font-weight: 700; font-size: 22px; text-align: center; }
 .option-tools { margin-top: var(--space-1); gap: var(--space-1); }
-.option-check { min-height: 44px; padding: 0 var(--space-2); background: var(--bg); }
+.option-check { min-height: 44px; padding: 0 var(--space-2); background: var(--surface); }
 .row > .field-seat { flex: none; }
 .stack-lg > .choices { margin-top: var(--space-3); }
 @media (max-width: 480px) {
@@ -235,19 +282,19 @@ a.btn { text-decoration: none; }
 .warning {
   margin: 0;
   padding: var(--space-1) var(--space-2);
-  border: 2px solid #b26a00;
+  border: 1px solid var(--warning);
   border-radius: var(--radius);
-  background: #fff6e5;
-  color: #6b3f00;
+  background: var(--warning-soft);
+  color: var(--warning);
   font-weight: 700;
 }
 
 /* Lesson (上課): projected, so big text and high contrast. */
 .notice {
   padding: var(--space-1) var(--space-2);
-  border: 2px solid #b26a00;
+  border: 1px solid var(--warning);
   border-radius: var(--radius);
-  background: #fff6e5;
+  background: var(--warning-soft);
   font-weight: 700;
 }
 /* The lesson screen uses the whole (projected) window; text grows with its width. */
@@ -273,15 +320,15 @@ a.btn { text-decoration: none; }
   font-size: clamp(17px, 1.1vw, 22px);
   text-align: left;
   color: var(--text);
-  background: var(--bg);
+  background: var(--surface);
   border: 2px solid var(--border);
   border-radius: var(--radius);
   cursor: pointer;
 }
-.lesson-item-on { border-color: var(--primary); box-shadow: inset 0 0 0 2px var(--primary); background: #eef2fb; font-weight: 700; }
+.lesson-item-on { border-color: var(--primary); box-shadow: inset 0 0 0 2px var(--primary); background: var(--primary-soft); font-weight: 700; }
 .lesson-status { font-size: 0.85em; font-weight: 400; color: var(--text-muted); }
-.status-open { color: #1b6e2a; font-weight: 700; }
-.status-closed { color: #b26a00; font-weight: 700; }
+.status-open { color: var(--success); font-weight: 700; }
+.status-closed { color: var(--warning); font-weight: 700; }
 .status-revealed { color: var(--primary); }
 .status-reviewing { color: #7a3fb0; font-weight: 700; }
 .lesson-main { display: grid; gap: var(--space-2); }
@@ -333,10 +380,10 @@ a.btn { text-decoration: none; }
 .bars { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
 .bar { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto; gap: var(--space-2); align-items: center; font-size: clamp(22px, 1.8vw, 36px); }
 .bar-label { overflow-wrap: anywhere; }
-.bar-mark { display: block; color: #1b6e2a; font-size: var(--fs-body); }
-.bar-track { height: 1.3em; background: var(--bg-soft); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.bar-mark { display: block; color: var(--success); font-size: var(--fs-body); }
+.bar-track { height: 1.3em; background: var(--surface-soft); border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
 .bar-fill { display: block; height: 100%; background: #6b7a99; }
-.bar-correct .bar-fill { background: #1b6e2a; }
+.bar-correct .bar-fill { background: var(--success); }
 .bar-correct .bar-label { font-weight: 700; }
 .bar-count { white-space: nowrap; min-width: 7.5em; text-align: right; }
 @media (max-width: 700px) { .bar { grid-template-columns: 1fr auto; } .bar-track { grid-column: 1 / -1; order: 3; } }
@@ -353,17 +400,17 @@ a.btn { text-decoration: none; }
   margin-left: var(--space-1);
   padding: 2px 10px;
   border-radius: 999px;
-  background: #fff1d6;
-  border: 2px solid #b26a00;
-  color: #6b3f00;
+  background: var(--warning-soft);
+  border: 1px solid var(--warning);
+  color: var(--warning);
   font-size: var(--fs-small);
   font-weight: 700;
   white-space: nowrap;
 }
 .badge-link { text-decoration: none; margin-left: 0; }
 .row-link { cursor: pointer; }
-.row-link:hover td { background: #f5f7fc; }
-.row-absent td { color: #8a9099; background: var(--bg-soft); }
+.row-link:hover td { background: var(--surface-soft); }
+.row-absent td { color: var(--text-muted); background: var(--surface-soft); }
 .records-table .wrap { white-space: normal; min-width: 12em; }
 .record-when { display: block; font-size: var(--fs-small); }
 .record-summary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-4); margin-bottom: var(--space-3); }
@@ -372,9 +419,9 @@ a.btn { text-decoration: none; }
 .record-download { margin-left: auto; }
 .score-table .num { text-align: center; }
 .score-table .total { font-weight: 700; }
-.cell-correct { color: #1b6e2a; font-weight: 700; }
+.cell-correct { color: var(--success); font-weight: 700; }
 .cell-wrong { color: var(--danger); font-weight: 700; }
-.cell-ungraded { color: #b26a00; }
+.cell-ungraded { color: var(--warning); }
 .cell-unanswered { color: var(--text-muted); }
 .sort-button { font: inherit; font-weight: 700; color: var(--primary); background: none; border: 0; padding: 0; min-height: 44px; cursor: pointer; text-decoration: underline; }
 .table-note { font-size: var(--fs-small); margin-top: var(--space-1); }
@@ -383,17 +430,17 @@ a.btn { text-decoration: none; }
 
 .question-nav { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-2); }
 .question-nav h2 { margin: 0; }
-.record-question { background: var(--bg); }
+.record-question { background: var(--surface); }
 .record-question .qv-text { font-size: 26px; }
 .record-correct { margin: var(--space-2) 0 0; font-size: 24px; }
 .who-answered { display: grid; gap: var(--space-2); }
 .who-answered h3, .who-option p { margin: 0; }
-.who-option { border: 2px solid var(--border); border-radius: var(--radius); padding: var(--space-1) var(--space-2); }
-.who-correct { border-color: #1b6e2a; background: #f0f8f1; }
+.who-option { border: 2px solid var(--border); border-radius: var(--radius); padding: var(--space-1) var(--space-2); background: var(--surface); }
+.who-correct { border-color: var(--success); background: var(--success-soft); }
 .who-label { font-weight: 700; margin-bottom: 4px !important; }
-.who-label strong { color: #1b6e2a; margin-left: var(--space-1); }
+.who-label strong { color: var(--success); margin-left: var(--space-1); }
 .name-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
-.name-chips li { padding: 2px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }
+.name-chips li { padding: 2px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
 
 /* 簡答批改 */
 .grader { display: grid; gap: var(--space-2); }
@@ -408,16 +455,16 @@ a.btn { text-decoration: none; }
   padding: 4px 12px;
   border: 2px solid var(--border);
   border-radius: var(--radius);
-  background: var(--bg);
+  background: var(--surface);
   color: var(--text);
   cursor: pointer;
 }
-.grader-name-on { border-color: var(--primary); box-shadow: inset 0 0 0 2px var(--primary); background: #eef2fb; font-weight: 700; }
-.grader-score { margin-left: 6px; color: #1b6e2a; font-size: var(--fs-small); }
-.grader-card, .grader-done { background: var(--bg); }
+.grader-name-on { border-color: var(--primary); box-shadow: inset 0 0 0 2px var(--primary); background: var(--primary-soft); font-weight: 700; }
+.grader-score { margin-left: 6px; color: var(--success); font-size: var(--fs-small); }
+.grader-card, .grader-done { background: var(--surface); }
 .grader-who { font-size: 24px; font-weight: 700; margin: 0 0 var(--space-2); }
 .grader-now { margin-left: var(--space-2); font-size: var(--fs-body); font-weight: 400; color: var(--text-muted); }
-.grader-text { font-size: 28px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; padding: var(--space-2); background: var(--bg-soft); border-radius: var(--radius); }
+.grader-text { font-size: 28px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; padding: var(--space-2); background: var(--surface-soft); border-radius: var(--radius); }
 .grader-label { font-weight: 700; margin-top: var(--space-3); }
 .score-buttons { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 .score-button { min-width: 72px; min-height: 72px; font-size: 28px; }
@@ -441,7 +488,7 @@ a.btn { text-decoration: none; }
 .answer-picker { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); font-size: clamp(20px, 1.5vw, 30px); }
 .answer-picker-label { font-weight: 700; }
 .answer-choice { min-width: 72px; font-size: inherit; }
-.draw-result { display: grid; place-items: center; min-height: 200px; padding: var(--space-2); text-align: center; background: var(--bg-soft); border-radius: var(--radius); }
+.draw-result { display: grid; place-items: center; min-height: 200px; padding: var(--space-2); text-align: center; background: var(--surface-soft); border-radius: var(--radius); }
 .draw-result p { margin: 0; }
 .draw-name { font-size: clamp(48px, 6vw, 96px); font-weight: 700; line-height: 1.2; }
 .draw-detail { font-size: clamp(24px, 2.4vw, 40px); }
@@ -449,20 +496,20 @@ a.btn { text-decoration: none; }
 .draw-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-1); }
 .check { display: flex; align-items: center; gap: var(--space-1); margin: 0; min-height: 48px; }
 .check input { width: 24px; height: 24px; }
-.notice-text { margin: 0; font-weight: 700; color: #b26a00; }
+.notice-text { margin: 0; font-weight: 700; color: var(--warning); }
 .timer-presets { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-1); }
 .timer-preset { min-height: 64px; font-size: 24px; }
 .timer { display: flex; align-items: center; gap: var(--space-1); margin-left: auto; padding: 4px var(--space-1) 4px var(--space-2); border: 3px solid var(--primary); border-radius: var(--radius); }
 .timer-clock { min-width: 3.2em; font-size: clamp(36px, 3.6vw, 64px); font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; text-align: center; }
-.timer-done { border-color: var(--danger); background: #fdeceb; color: var(--danger); }
+.timer-done { border-color: var(--danger); background: var(--danger-soft); color: var(--danger); }
 .timeup-overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: var(--space-3); background: rgba(0, 0, 0, 0.6); }
-.timeup-card { display: grid; gap: var(--space-3); justify-items: center; width: min(90vw, 900px); padding: var(--space-4); background: #fff; border-radius: var(--radius); }
+.timeup-card { display: grid; gap: var(--space-3); justify-items: center; width: min(90vw, 900px); padding: var(--space-4); background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-lg); }
 .timeup-card p { margin: 0; }
 .timeup-text { font-size: clamp(96px, 14vw, 220px); font-weight: 700; line-height: 1.1; color: var(--danger); }
 .timeup-card .btn-main { min-width: 360px; }
 
 /* 搶答: fills the lesson screen (projected). Under 時間到 (z-index 100), over dialogs. */
-.buzz-screen { position: fixed; inset: 0; z-index: 20; display: grid; grid-template-rows: 1fr auto auto auto; gap: var(--space-2); padding: var(--space-3) var(--space-4); background: var(--bg); }
+.buzz-screen { position: fixed; inset: 0; z-index: 20; display: grid; grid-template-rows: 1fr auto auto auto; gap: var(--space-2); padding: var(--space-3) var(--space-4); background: var(--surface); }
 .buzz-main { display: grid; place-items: center; min-height: 0; overflow: auto; }
 .buzz-big { margin: 0; font-size: clamp(120px, 22vh, 260px); font-weight: 700; line-height: 1; }
 .buzz-countdown { color: var(--primary); font-variant-numeric: tabular-nums; }

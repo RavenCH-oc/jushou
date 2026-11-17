@@ -95,9 +95,9 @@ function Login({ onDone }: { onDone: () => void }) {
   };
 
   return (
-    <main class="page narrow">
-      <h1>舉手・老師登入</h1>
-      <form class="stack" onSubmit={submit}>
+    <main class="page narrow login">
+      <form class="card stack" onSubmit={submit}>
+        <h1>舉手・老師登入</h1>
         <div>
           <label for="pw">密碼</label>
           <input

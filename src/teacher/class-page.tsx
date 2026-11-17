@@ -1,7 +1,7 @@
 import { useState } from "preact/hooks";
 import { api } from "./api";
 import { href } from "./router";
-import { Confirm, ErrorText, Loading, useAction, useLoad } from "./ui";
+import { AppBar, Confirm, ErrorText, Loading, useAction, useLoad } from "./ui";
 import { Roster } from "./roster";
 import { RecordList } from "./records";
 import { MAX_CLASS_NAME } from "../shared/limits";
@@ -19,43 +19,43 @@ export function ClassPage({ id, tab }: { id: string; tab: string }) {
   if (!cls) return <Loading error={error} />;
 
   return (
-    <main class="page">
-      <a class="back" href={href("/")}>
-        ← 回首頁
-      </a>
-      <header class="topbar">
-        <h1>{cls.name}</h1>
-        <div class="row row-center">
-          <p class="join-code">
-            加入碼 <strong>{cls.joinCode}</strong>
-          </p>
-          <a class="btn" href={href(`/start/${cls.id}`)}>
-            開始上課
-          </a>
-        </div>
-      </header>
-      <nav class="tabs">
-        {TABS.map((t) => (
-          <a
-            key={t.key}
-            class={`tab${t.key === tab ? " tab-active" : ""}`}
-            aria-current={t.key === tab ? "page" : undefined}
-            href={href(`/class/${id}${t.key ? `/${t.key}` : ""}`)}
-          >
-            {t.label}
-          </a>
-        ))}
-      </nav>
-      {tab === "groups" ? (
-        <Groupings cls={cls} />
-      ) : tab === "records" ? (
-        <RecordList cls={cls} />
-      ) : tab === "settings" ? (
-        <Settings cls={cls} reload={reload} />
-      ) : (
-        <Roster cls={cls} reload={reload} />
-      )}
-    </main>
+    <>
+      <AppBar crumbs={[{ label: "首頁", href: href("/") }, { label: cls.name }]} />
+      <main class="page">
+        <header class="topbar">
+          <h1>{cls.name}</h1>
+          <div class="row row-center">
+            <p class="join-code">
+              加入碼 <strong>{cls.joinCode}</strong>
+            </p>
+            <a class="btn" href={href(`/start/${cls.id}`)}>
+              開始上課
+            </a>
+          </div>
+        </header>
+        <nav class="tabs">
+          {TABS.map((t) => (
+            <a
+              key={t.key}
+              class={`tab${t.key === tab ? " tab-active" : ""}`}
+              aria-current={t.key === tab ? "page" : undefined}
+              href={href(`/class/${id}${t.key ? `/${t.key}` : ""}`)}
+            >
+              {t.label}
+            </a>
+          ))}
+        </nav>
+        {tab === "groups" ? (
+          <Groupings cls={cls} />
+        ) : tab === "records" ? (
+          <RecordList cls={cls} />
+        ) : tab === "settings" ? (
+          <Settings cls={cls} reload={reload} />
+        ) : (
+          <Roster cls={cls} reload={reload} />
+        )}
+      </main>
+    </>
   );
 }
 
