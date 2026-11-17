@@ -36,66 +36,80 @@ export function Home({ onLogout }: { onLogout: () => void }) {
         </button>
       </AppBar>
       <main class="page">
-        <header class="topbar topbar-end">
-          <a class={`btn${active ? " btn-secondary" : ""}`} href={href("/start")}>
-            開始上課
-          </a>
-        </header>
-        {active && (
-          <div class="card lesson-banner notice">
-            <p>上課中：{active.className}</p>
-            <a class="btn" href={href(`/lesson/${active.id}`)}>
-              回到課堂
+        {active ? (
+          <section class="card home-start home-start-active">
+            <h2>上課中：{active.className}</h2>
+            <div class="row row-center">
+              <a class="btn btn-secondary" href={href("/start")}>
+                開始上課
+              </a>
+              <a class="btn" href={href(`/lesson/${active.id}`)}>
+                回到課堂
+              </a>
+            </div>
+          </section>
+        ) : (
+          <section class="card home-start">
+            <div>
+              <h2>開始上課</h2>
+              <p class="muted">選班級和題組，學生用手機加入</p>
+            </div>
+            <a class="btn" href={href("/start")}>
+              開始上課
             </a>
-          </div>
+          </section>
         )}
-        <section>
-          <div class="section-head">
-            <h2>班級</h2>
-            <a class="btn btn-secondary" href={href("/new")}>
-              新增班級
-            </a>
+        <div class="home-cols">
+          <div class="home-col">
+            <section class="card panel">
+              <div class="panel-head">
+                <h2>班級</h2>
+                <a class="btn btn-secondary btn-small" href={href("/new")}>
+                  新增班級
+                </a>
+              </div>
+              {classes.length === 0 ? (
+                <p class="panel-empty">還沒有班級。按「新增班級」開始。</p>
+              ) : (
+                <ul class="list">
+                  {classes.map((c) => (
+                    <li key={c.id}>
+                      <a class="list-row" href={href(`/class/${c.id}`)}>
+                        <strong class="list-main">{c.name}</strong>
+                        <span class="list-meta">{c.studentCount} 位學生</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+            <RecentRecords list={recent} />
           </div>
-          {classes.length === 0 ? (
-            <p class="muted">還沒有班級。按「新增班級」開始。</p>
-          ) : (
-            <ul class="card-list">
-              {classes.map((c) => (
-                <li key={c.id}>
-                  <a class="card card-link" href={href(`/class/${c.id}`)}>
-                    <strong>{c.name}</strong>
-                    <span class="muted">{c.studentCount} 位學生</span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-        <RecentRecords list={recent} />
-        <section class="home-section">
-          <div class="section-head">
-            <h2>題組</h2>
-            <a class="btn btn-secondary" href={href("/new-set")}>
-              新增題組
-            </a>
-          </div>
-          {sets.length === 0 ? (
-            <p class="muted">還沒有題組。按「新增題組」開始出題。</p>
-          ) : (
-            <ul class="card-list">
-              {sets.map((s) => (
-                <li key={s.id}>
-                  <a class="card card-link" href={href(`/set/${s.id}`)}>
-                    <strong>{s.name}</strong>
-                    <span class="muted">
-                      {s.questionCount} 題・{formatTime(s.updatedAt)} 修改
-                    </span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+          <section class="card panel">
+            <div class="panel-head">
+              <h2>題組</h2>
+              <a class="btn btn-secondary btn-small" href={href("/new-set")}>
+                新增題組
+              </a>
+            </div>
+            {sets.length === 0 ? (
+              <p class="panel-empty">還沒有題組。按「新增題組」開始出題。</p>
+            ) : (
+              <ul class="list">
+                {sets.map((s) => (
+                  <li key={s.id}>
+                    <a class="list-row" href={href(`/set/${s.id}`)}>
+                      <strong class="list-main">{s.name}</strong>
+                      <span class="list-meta">
+                        {s.questionCount} 題・{formatTime(s.updatedAt)} 修改
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
       </main>
     </>
   );
@@ -117,8 +131,8 @@ export function NewSet() {
     <>
       <AppBar crumbs={[{ label: "首頁", href: href("/") }, { label: "新增題組" }]} />
       <main class="page narrow">
-        <h1>新增題組</h1>
-        <form class="stack" onSubmit={submit}>
+        <form class="card stack form-card" onSubmit={submit}>
+          <h1>新增題組</h1>
           <div>
             <label for="name">題組名稱</label>
             <input
@@ -162,8 +176,8 @@ export function NewClass() {
     <>
       <AppBar crumbs={[{ label: "首頁", href: href("/") }, { label: "新增班級" }]} />
       <main class="page narrow">
-        <h1>新增班級</h1>
-        <form class="stack" onSubmit={submit}>
+        <form class="card stack form-card" onSubmit={submit}>
+          <h1>新增班級</h1>
           <div>
             <label for="name">班級名稱</label>
             <input

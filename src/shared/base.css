@@ -34,6 +34,9 @@
   --disabled: #c3cad5;
   --disabled-text: #4a5260;
 
+  /* 長條圖一般選項 */
+  --chart: #6b7a99;
+
   /* 陰影與圓角 */
   --shadow: 0 1px 3px rgba(20, 30, 50, 0.10);
   --shadow-lg: 0 8px 24px rgba(20, 30, 50, 0.18);
@@ -117,6 +120,8 @@ p { margin: 0 0 var(--space-2); }
   cursor: pointer;
 }
 .btn-text:hover { background: var(--primary-soft); }
+.btn-text-danger { color: var(--danger); }
+.btn-text-danger:hover { background: var(--danger-soft); }
 
 .btn:disabled, .btn:disabled:hover {
   background: var(--disabled);
@@ -178,3 +183,17 @@ label { display: block; font-weight: 700; margin-bottom: var(--space-1); }
   border: 1px solid var(--warning);
   border-radius: var(--radius-sm);
 }
+
+/* Small status label: .badge (warning), .badge-success, .badge-neutral */
+.badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: var(--fs-small);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.badge-success { background: var(--success-soft); color: var(--success); }
+.badge-neutral { background: var(--surface-soft); color: var(--text-muted); }

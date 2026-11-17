@@ -283,25 +283,27 @@ function Editor(props: { set: QuestionSetDetail; existing?: Question; type: Ques
                           正確答案
                         </label>
                       )}
-                      <button type="button" class="btn btn-secondary btn-small" disabled={i === 0} onClick={() => setOptions((l) => swap(l, i, i - 1))}>
-                        上移
-                      </button>
-                      <button
-                        type="button"
-                        class="btn btn-secondary btn-small"
-                        disabled={i === draft.options.length - 1}
-                        onClick={() => setOptions((l) => swap(l, i, i + 1))}
-                      >
-                        下移
-                      </button>
-                      <button
-                        type="button"
-                        class="btn btn-secondary btn-small"
-                        disabled={draft.options.length <= MIN_OPTIONS}
-                        onClick={() => setOptions((l) => l.filter((_, j) => j !== i))}
-                      >
-                        刪除
-                      </button>
+                      <span class="option-moves">
+                        <button type="button" class="btn-text" disabled={i === 0} onClick={() => setOptions((l) => swap(l, i, i - 1))}>
+                          上移
+                        </button>
+                        <button
+                          type="button"
+                          class="btn-text"
+                          disabled={i === draft.options.length - 1}
+                          onClick={() => setOptions((l) => swap(l, i, i + 1))}
+                        >
+                          下移
+                        </button>
+                        <button
+                          type="button"
+                          class="btn-text btn-text-danger"
+                          disabled={draft.options.length <= MIN_OPTIONS}
+                          onClick={() => setOptions((l) => l.filter((_, j) => j !== i))}
+                        >
+                          刪除
+                        </button>
+                      </span>
                     </div>
                   </div>
                 ))}

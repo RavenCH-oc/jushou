@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "preact/hooks";
 import type { ComponentChild } from "preact";
 import { api } from "./api";
 import { go, href } from "./router";
-import { AppBar, Confirm, type Crumb, ErrorText, Loading, Modal, useAction, useLoad } from "./ui";
+import { AppBar, Confirm, type Crumb, ErrorText, Loading, Modal, useAction, useHelp, useLoad } from "./ui";
 import { AnswerBars } from "./lesson";
 import { QuestionText } from "../student/question-view";
 import { toStudentView } from "../shared/grading";
@@ -67,6 +67,7 @@ export function RecordList({ cls }: { cls: ClassDetail }) {
                 <th>出席</th>
                 <th>平均得分率</th>
                 <th />
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -82,6 +83,9 @@ export function RecordList({ cls }: { cls: ClassDetail }) {
                   <td>{percent(summaryRate(l))}</td>
                   <td>
                     <Ungraded n={l.ungraded} />
+                  </td>
+                  <td class="chev" aria-hidden="true">
+                    ›
                   </td>
                 </tr>
               ))}
@@ -127,16 +131,18 @@ function ExportDialog({ className, list, onClose }: { className: string; list: L
       <button class="btn-text" onClick={() => setPicked(all ? new Set() : new Set(list.map((l) => l.id)))}>
         {all ? "全部取消" : "全選"}
       </button>
-      <div class="choices export-list">
+      <ul class="check-list">
         {list.map((l) => (
-          <label key={l.id} class={`choice${picked.has(l.id) ? " choice-on" : ""}`}>
-            <input type="checkbox" checked={picked.has(l.id)} onChange={() => toggle(l.id)} />
-            <span>
-              {formatTaipei(l.startedAt)}　{l.setName}
-            </span>
-          </label>
+          <li key={l.id}>
+            <label class={`check-row${picked.has(l.id) ? " check-row-on" : ""}`}>
+              <input type="checkbox" checked={picked.has(l.id)} onChange={() => toggle(l.id)} />
+              <span>
+                {formatTaipei(l.startedAt)}　{l.setName}
+              </span>
+            </label>
+          </li>
         ))}
-      </div>
+      </ul>
       <ErrorText message={action.error} />
       <div class="stack">
         <button class="btn btn-block" disabled={!picked.size || action.busy} onClick={run}>
@@ -155,17 +161,19 @@ function ExportDialog({ className, list, onClose }: { className: string; list: L
 export function RecentRecords({ list }: { list: LessonSummary[] }) {
   if (!list.length) return null;
   return (
-    <section class="home-section">
-      <h2>最近上課</h2>
-      <ul class="card-list">
+    <section class="card panel">
+      <div class="panel-head">
+        <h2>最近上課</h2>
+      </div>
+      <ul class="list">
         {list.map((l) => (
           <li key={l.id}>
-            <a class="card card-link" href={href(`/record/${l.id}`)}>
-              <span>
+            <a class="list-row" href={href(`/record/${l.id}`)}>
+              <span class="list-main">
                 <strong>
                   {l.className}・{l.setName}
                 </strong>
-                <span class="muted record-when">
+                <span class="muted">
                   {formatTaipei(l.startedAt)}・出席 {l.present}／{l.total}
                 </span>
               </span>
@@ -179,6 +187,15 @@ export function RecentRecords({ list }: { list: LessonSummary[] }) {
 }
 
 // --- 上課紀錄頁 ---
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <p class="card stat">
+      <span class="stat-label">{label}</span>
+      <span class="stat-value">{value}</span>
+    </p>
+  );
+}
 
 const TABS = [
   { key: "", label: "學生成績" },
@@ -227,25 +244,15 @@ export function RecordPage({ id, tab, qid }: { id: string; tab?: string; qid?: s
           {record.className}・{record.setName}・{formatTaipei(record.startedAt)}
         </h1>
         {!qid && (
-          <div class="record-summary">
-            <p>
-              出席{" "}
-              <strong>
-                {a.present}／{a.total}
-              </strong>
-            </p>
-            <p>
-              平均分數{" "}
-              <strong>
-                {oneDecimal(a.average)}／{a.max}
-              </strong>
-            </p>
+          <div class="stats">
+            <Stat label="出席" value={`${a.present}／${a.total}`} />
+            <Stat label="平均分數" value={`${oneDecimal(a.average)}／${a.max}`} />
             {firstUngraded && (
               <a class="badge badge-link" href={href(`/record/${id}/q/${firstUngraded.q.id}`)}>
                 還有 {a.ungraded} 份簡答沒批改
               </a>
             )}
-            <button class="btn record-download" disabled={exporting.busy} onClick={downloadExcel}>
+            <button class="btn stats-end" disabled={exporting.busy} onClick={downloadExcel}>
               {exporting.busy ? "準備中…" : "下載 Excel"}
             </button>
           </div>
@@ -276,7 +283,7 @@ export function RecordPage({ id, tab, qid }: { id: string; tab?: string; qid?: s
               <ScoreTable a={a} />
             )}
             <div class="tools">
-              <button class="btn btn-secondary" onClick={() => setConfirmDelete(true)}>
+              <button class="btn-text btn-text-danger" onClick={() => setConfirmDelete(true)}>
                 刪除這堂紀錄
               </button>
             </div>
@@ -304,63 +311,74 @@ export function RecordPage({ id, tab, qid }: { id: string; tab?: string; qid?: s
 function ScoreTable({ a }: { a: Analysis }) {
   const [byScore, setByScore] = useState(false);
   const rows = byScore ? [...a.students].sort((x, y) => (y.score ?? -1) - (x.score ?? -1) || x.seat - y.seat) : a.students;
+  const help = useHelp(
+    "計分方式說明",
+    "沒加入課堂也沒交答案，算缺席，分數留空。有出席但某題沒作答，那題算 0 分。沒出過的題目不算。簡答還沒批改的先算 0 分，批改後會更新。「不計分」的題目不列入總分。",
+  );
   return (
-    <div class="table-wrap">
-      <table class="table score-table">
-        <thead>
-          <tr>
-            <th>座號</th>
-            <th>姓名</th>
-            {a.asked.map(
-              (q, i) =>
-                q.scored && (
-                  <th key={q.id} class="num" title={questionSnippet(q.text)}>
-                    第{i + 1}題
-                  </th>
-                ),
+    <section>
+      <div class="title-row">
+        <h2>學生成績</h2>
+        {help.button}
+      </div>
+      {help.text}
+      <div class="table-wrap">
+        <table class="table score-table">
+          <thead>
+            <tr>
+              <th>座號</th>
+              <th>姓名</th>
+              {a.asked.map(
+                (q, i) =>
+                  q.scored && (
+                    <th key={q.id} class="num" title={questionSnippet(q.text)}>
+                      第{i + 1}題
+                    </th>
+                  ),
+              )}
+              <th class="num">
+                <button class="sort-button" aria-pressed={byScore} onClick={() => setByScore(!byScore)}>
+                  總分（滿分 {a.max}）{byScore ? "▼" : "⇅"}
+                </button>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((s) =>
+              s.present ? (
+                <tr key={s.id} class="row-link" onClick={() => go(`/student/${s.id}`)}>
+                  <td>{s.seat}</td>
+                  <td>
+                    <a href={href(`/student/${s.id}`)}>{s.name}</a>
+                  </td>
+                  {s.cells.map(
+                    (c, i) =>
+                      c.kind !== "unscored" && (
+                        <td key={i} class={`num cell-${c.kind}`}>
+                          {cellMark(a.asked[i], c)}
+                        </td>
+                      ),
+                  )}
+                  <td class="num total">{s.score}</td>
+                </tr>
+              ) : (
+                <tr key={s.id} class="row-link row-absent" onClick={() => go(`/student/${s.id}`)}>
+                  <td>{s.seat}</td>
+                  <td>
+                    <a href={href(`/student/${s.id}`)}>{s.name}</a>
+                  </td>
+                  <td colSpan={a.asked.filter((q) => q.scored).length + 1}>缺席</td>
+                </tr>
+              ),
             )}
-            <th class="num">
-              <button class="sort-button" aria-pressed={byScore} onClick={() => setByScore(!byScore)}>
-                總分（滿分 {a.max}）{byScore ? "▼" : "⇅"}
-              </button>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((s) =>
-            s.present ? (
-              <tr key={s.id}>
-                <td>{s.seat}</td>
-                <td>
-                  <a href={href(`/student/${s.id}`)}>{s.name}</a>
-                </td>
-                {s.cells.map(
-                  (c, i) =>
-                    c.kind !== "unscored" && (
-                      <td key={i} class={`num cell-${c.kind}`}>
-                        {cellMark(a.asked[i], c)}
-                      </td>
-                    ),
-                )}
-                <td class="num total">{s.score}</td>
-              </tr>
-            ) : (
-              <tr key={s.id} class="row-absent">
-                <td>{s.seat}</td>
-                <td>
-                  <a href={href(`/student/${s.id}`)}>{s.name}</a>
-                </td>
-                <td colSpan={a.asked.filter((q) => q.scored).length + 1}>缺席</td>
-              </tr>
-            ),
-          )}
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
       <p class="muted table-note">
         ○ 答對　✕ 答錯　— 沒作答　數字是簡答的分數；還沒批改的簡答先算 0 分。
         {a.asked.some((q) => !q.scored) && "「不計分」的題目不列在這裡。"}
       </p>
-    </div>
+    </section>
   );
 }
 
@@ -376,6 +394,7 @@ function QuestionTable({ record, a }: { record: LessonRecord; a: Analysis }) {
             <th>題目</th>
             <th>正確率</th>
             <th>作答人數</th>
+            <th />
           </tr>
         </thead>
         <tbody>
@@ -386,7 +405,7 @@ function QuestionTable({ record, a }: { record: LessonRecord; a: Analysis }) {
               </td>
               <td>
                 {typeLabel(x.q.type)}
-                {x.q.quick && <span class="tag">臨時</span>}
+                {x.q.quick && <span class="badge badge-neutral tag-badge">臨時</span>}
               </td>
               <td class="wrap">{questionSnippet(x.q.text)}</td>
               <td>
@@ -398,6 +417,9 @@ function QuestionTable({ record, a }: { record: LessonRecord; a: Analysis }) {
               </td>
               <td>
                 {x.answered}／{a.present}
+              </td>
+              <td class="chev" aria-hidden="true">
+                ›
               </td>
             </tr>
           ))}
@@ -412,9 +434,25 @@ type Groups = { name: string; studentIds: string[] }[];
 // The groups as they were when the lesson ended. Lessons that ended before those were
 // recorded fall back to the class's groups as they are now, and say so.
 function GroupView({ record, a }: { record: LessonRecord; a: Analysis }) {
-  if (!record.groupings) return <CurrentGroupView record={record} a={a} />;
   const groupings = record.groupings;
-  return <GroupingPicker groupings={groupings} render={(id) => <GroupTable groups={groupings.find((g) => g.id === id)!.groups} a={a} />} />;
+  const help = useHelp(
+    "分組說明",
+    groupings ? "用的是這堂課結束時的分組。之後再換組，這裡不會變。" : "這堂課沒有記錄當時的分組，以下是現在的分組。",
+  );
+  return (
+    <section>
+      <div class="title-row">
+        <h2>依分組看</h2>
+        {help.button}
+      </div>
+      {help.text}
+      {groupings ? (
+        <GroupingPicker groupings={groupings} render={(id) => <GroupTable groups={groupings.find((g) => g.id === id)!.groups} a={a} />} />
+      ) : (
+        <CurrentGroupView record={record} a={a} />
+      )}
+    </section>
+  );
 }
 
 function CurrentGroupView({ record, a }: { record: LessonRecord; a: Analysis }) {
@@ -463,34 +501,36 @@ function GroupTable({ groups, a }: { groups: Groups; a: Analysis }) {
   const placed = new Set(groups.flatMap((g) => g.studentIds));
   const rows = [...groups, { name: "未分組", studentIds: a.students.map((s) => s.id).filter((id) => !placed.has(id)) }];
   return (
-    <table class="table records-table">
-      <thead>
-        <tr>
-          <th>組別</th>
-          <th>出席</th>
-          <th>平均總分</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((g, i) => {
-          const members = g.studentIds.map((id) => byId.get(id)).filter((s) => !!s);
-          if (!members.length) return null;
-          const present = members.filter((s) => s.present);
-          const avg = present.length ? present.reduce((sum, s) => sum + (s.score ?? 0), 0) / present.length : null;
-          return (
-            <tr key={i}>
-              <td>{g.name}</td>
-              <td>
-                {present.length}／{members.length}
-              </td>
-              <td>
-                {oneDecimal(avg)}／{a.max}
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+    <div class="table-wrap">
+      <table class="table records-table">
+        <thead>
+          <tr>
+            <th>組別</th>
+            <th>出席</th>
+            <th>平均總分</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((g, i) => {
+            const members = g.studentIds.map((id) => byId.get(id)).filter((s) => !!s);
+            if (!members.length) return null;
+            const present = members.filter((s) => s.present);
+            const avg = present.length ? present.reduce((sum, s) => sum + (s.score ?? 0), 0) / present.length : null;
+            return (
+              <tr key={i}>
+                <td>{g.name}</td>
+                <td>
+                  {present.length}／{members.length}
+                </td>
+                <td>
+                  {oneDecimal(avg)}／{a.max}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -565,7 +605,7 @@ function Names({ list }: { list: { id: string; seat: number; name: string }[] })
   return (
     <ul class="name-chips">
       {list.map((s) => (
-        <li key={s.id}>
+        <li key={s.id} class="chip">
           {s.seat} {s.name}
         </li>
       ))}
@@ -819,17 +859,9 @@ export function StudentPage({ id }: { id: string }) {
         <h1>
           {student.seat} 號 {student.name}
         </h1>
-        <div class="record-summary">
-          <p>
-            出席{" "}
-            <strong>
-              {attended}／{lessons.length}
-            </strong>{" "}
-            堂
-          </p>
-          <p>
-            平均得分率 <strong>{percent(historyRate(lessons))}</strong>
-          </p>
+        <div class="stats">
+          <Stat label="出席" value={`${attended}／${lessons.length} 堂`} />
+          <Stat label="平均得分率" value={percent(historyRate(lessons))} />
         </div>
         {lessons.length === 0 ? (
           <p class="muted">這個班還沒有上課紀錄。</p>
@@ -843,6 +875,7 @@ export function StudentPage({ id }: { id: string }) {
                   <th>出席</th>
                   <th>得分／滿分</th>
                   <th>得分率</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -858,6 +891,9 @@ export function StudentPage({ id }: { id: string }) {
                       {l.ungraded > 0 && <span class="muted">（{l.ungraded} 份簡答沒批改）</span>}
                     </td>
                     <td>{l.present ? percent(ratio(l.score, l.max)) : "—"}</td>
+                    <td class="chev" aria-hidden="true">
+                      ›
+                    </td>
                   </tr>
                 ))}
               </tbody>

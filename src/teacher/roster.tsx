@@ -15,7 +15,7 @@ export function Roster({ cls, reload }: { cls: ClassDetail; reload: () => void }
       <div class="section-head">
         <h2>學生名冊（{cls.students.length} 人）</h2>
         {!pasting && (
-          <button class="btn" onClick={() => (setPasting(true), setNotice(""))}>
+          <button class="btn btn-secondary" onClick={() => (setPasting(true), setNotice(""))}>
             貼上名冊
           </button>
         )}
@@ -156,7 +156,7 @@ function StudentTable({ cls, reload }: { cls: ClassDetail; reload: () => void })
   const [deleting, setDeleting] = useState<Student | null>(null);
 
   return (
-    <div class="table-wrap">
+    <div class="table-wrap roster-wrap">
       <table class="table">
         <thead>
           <tr>
@@ -178,10 +178,10 @@ function StudentTable({ cls, reload }: { cls: ClassDetail; reload: () => void })
                   </a>
                 </td>
                 <td class="actions">
-                  <button class="btn btn-secondary btn-small" onClick={() => setEditing(s.id)}>
+                  <button class="btn-text" onClick={() => setEditing(s.id)}>
                     修改
                   </button>
-                  <button class="btn btn-secondary btn-small" onClick={() => setDeleting(s)}>
+                  <button class="btn-text btn-text-danger" onClick={() => setDeleting(s)}>
                     刪除
                   </button>
                 </td>
@@ -243,7 +243,7 @@ function AddStudent({ cls, reload }: { cls: ClassDetail; reload: () => void }) {
 
   return (
     <form
-      class="card add-student"
+      class="card add-student roster-wrap"
       onSubmit={async (e) => {
         e.preventDefault();
         const ok = await run(() =>

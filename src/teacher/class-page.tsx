@@ -1,7 +1,7 @@
 import { useState } from "preact/hooks";
 import { api } from "./api";
 import { href } from "./router";
-import { AppBar, Confirm, ErrorText, Loading, useAction, useLoad } from "./ui";
+import { AppBar, Confirm, ErrorText, Loading, useAction, useHelp, useLoad } from "./ui";
 import { Roster } from "./roster";
 import { RecordList } from "./records";
 import { MAX_CLASS_NAME } from "../shared/limits";
@@ -16,6 +16,7 @@ const TABS = [
 
 export function ClassPage({ id, tab }: { id: string; tab: string }) {
   const { data: cls, error, reload } = useLoad(() => api<ClassDetail>("GET", `/classes/${id}`), [id]);
+  const help = useHelp("加入碼說明", "學生上課時在手機輸入這組數字加入。上課中不能更換，要換到「班級設定」。");
   if (!cls) return <Loading error={error} />;
 
   return (
@@ -28,11 +29,13 @@ export function ClassPage({ id, tab }: { id: string; tab: string }) {
             <p class="join-code">
               加入碼 <strong>{cls.joinCode}</strong>
             </p>
+            {help.button}
             <a class="btn" href={href(`/start/${cls.id}`)}>
               開始上課
             </a>
           </div>
         </header>
+        {help.text}
         <nav class="tabs">
           {TABS.map((t) => (
             <a
@@ -61,22 +64,22 @@ export function ClassPage({ id, tab }: { id: string; tab: string }) {
 
 function Groupings({ cls }: { cls: ClassDetail }) {
   return (
-    <section>
-      <div class="section-head">
+    <section class="card panel">
+      <div class="panel-head">
         <h2>分組</h2>
-        <a class="btn" href={href(`/class/${cls.id}/new-grouping`)}>
+        <a class="btn btn-secondary btn-small" href={href(`/class/${cls.id}/new-grouping`)}>
           新增分組
         </a>
       </div>
       {cls.groupings.length === 0 ? (
-        <p class="muted">還沒有分組。按「新增分組」可以隨機分組或自己分。</p>
+        <p class="panel-empty">還沒有分組。按「新增分組」可以隨機分組或自己分。</p>
       ) : (
-        <ul class="card-list">
+        <ul class="list">
           {cls.groupings.map((g) => (
             <li key={g.id}>
-              <a class="card card-link" href={href(`/grouping/${g.id}`)}>
-                <strong>{g.name}</strong>
-                <span class="muted">{g.groupCount} 組</span>
+              <a class="list-row" href={href(`/grouping/${g.id}`)}>
+                <strong class="list-main">{g.name}</strong>
+                <span class="list-meta">{g.groupCount} 組</span>
               </a>
             </li>
           ))}

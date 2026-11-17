@@ -54,8 +54,8 @@ export function NewGrouping({ classId }: { classId: string }) {
     <>
       <AppBar crumbs={[{ label: "首頁", href: href("/") }, { label: cls.name, href: href(`/class/${classId}/groups`) }, { label: "新增分組" }]} />
       <main class="page narrow">
-        <h1>新增分組</h1>
-        <form class="stack" onSubmit={submit}>
+        <form class="card stack form-card" onSubmit={submit}>
+          <h1>新增分組</h1>
           <div>
             <label for="gname">分組名稱</label>
             <input
@@ -149,37 +149,52 @@ export function GroupingPage({ id }: { id: string }) {
       <AppBar crumbs={[{ label: "首頁", href: href("/") }, { label: g.className, href: href(`/class/${g.classId}/groups`) }, { label: g.name }]} />
       <main class="page">
         <header class="topbar">
-          <h1>{g.name}</h1>
+          <div class="title-row">
+            <h1>{g.name}</h1>
+            <button class="btn-text" onClick={() => setDialog({ kind: "rename" })}>
+              ✎ 改名
+            </button>
+          </div>
           <a class="btn" href={href(`/grouping/${g.id}/show`)} onClick={enterFullscreen}>
             投影顯示
           </a>
         </header>
-        <p class="muted">點學生可以換組，點組名可以改名或刪除這一組。</p>
+        <p class="muted">點學生可以換組。</p>
         <ErrorText message={action.error} />
 
         <div class="group-grid">
           {g.groups.map((group) => (
-            <section key={group.id} class="card group">
-              <button class="group-name" onClick={() => setDialog({ kind: "group", id: group.id, name: group.name, size: group.studentIds.length })}>
-                {group.name}
-                <span class="muted">{group.studentIds.length} 人</span>
-              </button>
-              {group.studentIds.length === 0 && <p class="muted">還沒有人</p>}
-              {group.studentIds.map((sid) => {
-                const s = byId.get(sid)!;
-                return (
-                  <button key={sid} class="member" onClick={() => setDialog({ kind: "student", student: s, groupId: group.id })}>
-                    {s.seat} {s.name}
-                  </button>
-                );
-              })}
+            <section key={group.id} class="card panel">
+              <div class="panel-head group-head">
+                <h2>
+                  {group.name}
+                  <span class="muted">{group.studentIds.length} 人</span>
+                </h2>
+                <button
+                  class="btn-text"
+                  aria-label={`${group.name}改名`}
+                  onClick={() => setDialog({ kind: "group", id: group.id, name: group.name, size: group.studentIds.length })}
+                >
+                  ✎ 改名
+                </button>
+              </div>
+              <div class="group-body member-wrap">
+                {group.studentIds.length === 0 && <p class="muted">還沒有人</p>}
+                {group.studentIds.map((sid) => {
+                  const s = byId.get(sid)!;
+                  return (
+                    <button key={sid} class="member" onClick={() => setDialog({ kind: "student", student: s, groupId: group.id })}>
+                      {s.seat} {s.name}
+                    </button>
+                  );
+                })}
+              </div>
             </section>
           ))}
+          <button class="group-add" disabled={action.busy} onClick={addGroup}>
+            ＋ 新增一組
+          </button>
         </div>
-
-        <button class="btn btn-secondary" disabled={action.busy} onClick={addGroup}>
-          ＋ 新增一組
-        </button>
 
         {unplaced.length > 0 && (
           <section class="card unplaced tools">
@@ -194,18 +209,15 @@ export function GroupingPage({ id }: { id: string }) {
           </section>
         )}
 
-        <div class="row tools">
-          <button class="btn btn-secondary" onClick={() => setDialog({ kind: "rename" })}>
-            改分組名稱
-          </button>
-          <button class="btn btn-secondary" disabled={g.groups.length === 0} onClick={() => setDialog({ kind: "shuffle" })}>
+        <div class="row row-tight tools">
+          <button class="btn-text" disabled={g.groups.length === 0} onClick={() => setDialog({ kind: "shuffle" })}>
             重新隨機
           </button>
-          <button class="btn btn-secondary" disabled={action.busy} onClick={copy}>
+          <button class="btn-text" disabled={action.busy} onClick={copy}>
             複製這套分組
           </button>
-          <button class="btn btn-secondary" onClick={() => setDialog({ kind: "delete" })}>
-            刪除
+          <button class="btn-text btn-text-danger" onClick={() => setDialog({ kind: "delete" })}>
+            刪除這套分組
           </button>
         </div>
 
