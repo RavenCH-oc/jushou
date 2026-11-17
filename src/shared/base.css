@@ -1,13 +1,44 @@
 :root {
   --font: system-ui, "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif;
-  --text: #111;
-  --text-muted: #555;
-  --bg: #fff;
-  --bg-soft: #f2f3f5;
-  --border: #c8ccd2;
-  --primary: #1d3f8f;
+
+  /* 底色與表面 */
+  --bg-page: #d5dce6;        /* 頁面背景（灰藍） */
+  --surface: #fff;           /* 卡片、輸入框、次要按鈕、對話框 */
+  --surface-soft: #f3f5f8;   /* 卡片裡的淺色區塊 */
+
+  /* 文字 */
+  --text: #1a1d23;
+  --text-muted: #525a68;
+
+  /* 框線 */
+  --border: #c9d1dc;         /* 卡片、分隔線，一律 1px */
+  --border-strong: #8592a5;  /* 輸入框、次要按鈕、選項框 */
+
+  /* 主色 */
+  --primary: #1f4aa8;
+  --primary-hover: #193d8c;
+  --primary-soft: #e6edfa;
   --primary-text: #fff;
-  --danger: #b3261e;
+
+  /* 頂部列 */
+  --appbar: #1f2b3e;
+  --appbar-text: #fff;
+  --appbar-muted: #b8c3d4;
+
+  /* 狀態：文字色＋柔和底色成對使用 */
+  --success: #1b6b3a;  --success-soft: #e1f2e7;
+  --warning: #8a5a00;  --warning-soft: #fdf1d8;
+  --danger:  #b3261e;  --danger-soft:  #fbe9e7;
+
+  /* 停用的按鈕 */
+  --disabled: #c3cad5;
+  --disabled-text: #4a5260;
+
+  /* 陰影與圓角 */
+  --shadow: 0 1px 3px rgba(20, 30, 50, 0.10);
+  --shadow-lg: 0 8px 24px rgba(20, 30, 50, 0.18);
+  --radius: 10px;
+  --radius-sm: 6px;
 
   --fs-body: 20px;
   --fs-small: 17px;
@@ -18,7 +49,6 @@
   --space-2: 16px;
   --space-3: 24px;
   --space-4: 40px;
-  --radius: 10px;
   --tap: 56px;
 }
 
@@ -31,7 +61,7 @@ body {
   font-size: var(--fs-body);
   line-height: 1.5;
   color: var(--text);
-  background: var(--bg);
+  background: var(--bg-page);
 }
 
 h1 { font-size: var(--fs-title); margin: 0 0 var(--space-3); }
@@ -46,6 +76,7 @@ p { margin: 0 0 var(--space-2); }
 
 .narrow { max-width: 420px; }
 
+/* Buttons: 主要 .btn, 次要 .btn.btn-secondary, 文字 .btn-text */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -55,21 +86,45 @@ p { margin: 0 0 var(--space-2); }
   font: inherit;
   font-weight: 700;
   border-radius: var(--radius);
-  border: 2px solid var(--primary);
+  border: 1px solid var(--primary);
   background: var(--primary);
   color: var(--primary-text);
   cursor: pointer;
 }
-
-.btn:disabled { opacity: 0.6; cursor: default; }
+.btn:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
 .btn-block { display: flex; width: 100%; }
 
 .btn-secondary {
-  background: var(--bg);
-  color: var(--primary);
-  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border-strong);
   font-weight: 400;
 }
+.btn-secondary:hover { background: var(--surface-soft); border-color: var(--border-strong); }
+
+.btn-text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 12px;
+  font: inherit;
+  color: var(--primary);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  cursor: pointer;
+}
+.btn-text:hover { background: var(--primary-soft); }
+
+.btn:disabled, .btn:disabled:hover {
+  background: var(--disabled);
+  border-color: var(--disabled);
+  color: var(--disabled-text);
+  cursor: default;
+}
+.btn-text:disabled, .btn-text:disabled:hover { background: none; color: var(--disabled-text); cursor: default; }
 
 .field {
   display: block;
@@ -77,13 +132,13 @@ p { margin: 0 0 var(--space-2); }
   min-height: var(--tap);
   padding: 0 var(--space-2);
   font: inherit;
-  border: 2px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  background: var(--bg);
+  background: var(--surface);
   color: var(--text);
 }
 
-.field:focus, .btn:focus-visible {
+.field:focus, .btn:focus-visible, .btn-text:focus-visible {
   outline: 3px solid var(--primary);
   outline-offset: 2px;
 }
@@ -92,25 +147,16 @@ label { display: block; font-weight: 700; margin-bottom: var(--space-1); }
 
 .stack > * + * { margin-top: var(--space-2); }
 
-.link-button {
-  font: inherit;
-  color: var(--primary);
-  background: none;
-  border: 0;
-  padding: var(--space-1) 0;
-  min-height: 48px;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
 .error { color: var(--danger); font-weight: 700; }
 .muted { color: var(--text-muted); }
+.ok { color: var(--success); font-weight: 700; }
 
 .card {
-  border: 2px solid var(--border);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--space-3);
-  background: var(--bg-soft);
+  background: var(--surface);
+  box-shadow: var(--shadow);
 }
 
 /* Shown in a corner while the live connection is down; never a dialog. */
@@ -121,8 +167,8 @@ label { display: block; font-weight: 700; margin-bottom: var(--space-1); }
   margin: 0;
   padding: 4px var(--space-1);
   font-size: var(--fs-small);
-  color: var(--text);
-  background: #fff6e5;
-  border: 1px solid #b26a00;
-  border-radius: 6px;
+  color: var(--warning);
+  background: var(--warning-soft);
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-sm);
 }
