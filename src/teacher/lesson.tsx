@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { encode } from "uqr";
 import { api } from "./api";
 import { go, href } from "./router";
-import { Confirm, ErrorText, Loading, Modal, useAction, useLoad } from "./ui";
+import { AppBar, Confirm, ErrorText, Loading, Modal, useAction, useLoad } from "./ui";
 import { OfflineNote, useLive } from "../student/live";
 import { QuestionText, QuestionView } from "../student/question-view";
 import { toStudentView } from "../shared/grading";
@@ -41,71 +41,71 @@ export function StartLesson({ classId }: { classId: string }) {
   };
 
   return (
-    <main class="page narrow">
-      <a class="back" href={href(classId ? `/class/${classId}` : "/")}>
-        ← 回上一頁
-      </a>
-      <h1>開始上課</h1>
-      {active && (
-        <p class="notice">
-          「{active.className}」正在上課。<a href={href(`/lesson/${active.id}`)}>回到那堂課</a>
-        </p>
-      )}
-      <div class="stack-lg">
-        <fieldset class="choices">
-          <legend>1. 哪一班？</legend>
-          {classes.length === 0 && <p class="muted">還沒有班級，請先回首頁新增班級。</p>}
-          {classes.map((c) => (
-            <label key={c.id} class={`choice${cls === c.id ? " choice-on" : ""}`}>
-              <input type="radio" name="class" checked={cls === c.id} disabled={!c.studentCount} onChange={() => setCls(c.id)} />
+    <>
+      <AppBar crumbs={[{ label: "首頁", href: href("/") }, { label: "開始上課" }]} />
+      <main class="page narrow">
+        <h1>開始上課</h1>
+        {active && (
+          <p class="notice">
+            「{active.className}」正在上課。<a href={href(`/lesson/${active.id}`)}>回到那堂課</a>
+          </p>
+        )}
+        <div class="stack-lg">
+          <fieldset class="choices">
+            <legend>1. 哪一班？</legend>
+            {classes.length === 0 && <p class="muted">還沒有班級，請先回首頁新增班級。</p>}
+            {classes.map((c) => (
+              <label key={c.id} class={`choice${cls === c.id ? " choice-on" : ""}`}>
+                <input type="radio" name="class" checked={cls === c.id} disabled={!c.studentCount} onChange={() => setCls(c.id)} />
+                <span>
+                  {c.name}
+                  <span class="muted">　{c.studentCount ? `${c.studentCount} 位學生` : "（還沒有學生）"}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+          <fieldset class="choices">
+            <legend>2. 用哪一份題組？</legend>
+            <label class={`choice${set === "none" ? " choice-on" : ""}`}>
+              <input type="radio" name="set" checked={set === "none"} onChange={() => setSet("none")} />
               <span>
-                {c.name}
-                <span class="muted">　{c.studentCount ? `${c.studentCount} 位學生` : "（還沒有學生）"}</span>
+                不用題組<span class="muted">（只用臨時出題、抽人、計時器）</span>
               </span>
             </label>
-          ))}
-        </fieldset>
-        <fieldset class="choices">
-          <legend>2. 用哪一份題組？</legend>
-          <label class={`choice${set === "none" ? " choice-on" : ""}`}>
-            <input type="radio" name="set" checked={set === "none"} onChange={() => setSet("none")} />
-            <span>
-              不用題組<span class="muted">（只用臨時出題、抽人、計時器）</span>
-            </span>
-          </label>
-          {sets.length === 0 && <p class="muted">還沒有題組。要用題組的話，請先回首頁新增。</p>}
-          {sets.map((s) => (
-            <label key={s.id} class={`choice${set === s.id ? " choice-on" : ""}`}>
-              <input type="radio" name="set" checked={set === s.id} disabled={!s.questionCount} onChange={() => setSet(s.id)} />
-              <span>
-                {s.name}
-                <span class="muted">　{s.questionCount ? `${s.questionCount} 題` : "（還沒有題目）"}</span>
-              </span>
-            </label>
-          ))}
-        </fieldset>
-        <ErrorText message={action.error} />
-        <button
-          class="btn btn-block"
-          disabled={!cls || !set || action.busy}
-          onClick={() => (active ? setConfirmEnd(true) : action.run(start))}
-        >
-          {action.busy ? "準備中…" : "開始"}
-        </button>
-      </div>
-      {confirmEnd && active && (
-        <Confirm
-          title={`先結束「${active.className}」的課？`}
-          message="要開新的課，得先結束正在進行的那一堂。結束後那堂課的學生就不能再作答。"
-          confirmLabel="結束那堂課，開始新的課"
-          onConfirm={async () => {
-            await api("POST", `/lessons/${active.id}/end`);
-            await start();
-          }}
-          onClose={() => setConfirmEnd(false)}
-        />
-      )}
-    </main>
+            {sets.length === 0 && <p class="muted">還沒有題組。要用題組的話，請先回首頁新增。</p>}
+            {sets.map((s) => (
+              <label key={s.id} class={`choice${set === s.id ? " choice-on" : ""}`}>
+                <input type="radio" name="set" checked={set === s.id} disabled={!s.questionCount} onChange={() => setSet(s.id)} />
+                <span>
+                  {s.name}
+                  <span class="muted">　{s.questionCount ? `${s.questionCount} 題` : "（還沒有題目）"}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+          <ErrorText message={action.error} />
+          <button
+            class="btn btn-block"
+            disabled={!cls || !set || action.busy}
+            onClick={() => (active ? setConfirmEnd(true) : action.run(start))}
+          >
+            {action.busy ? "準備中…" : "開始"}
+          </button>
+        </div>
+        {confirmEnd && active && (
+          <Confirm
+            title={`先結束「${active.className}」的課？`}
+            message="要開新的課，得先結束正在進行的那一堂。結束後那堂課的學生就不能再作答。"
+            confirmLabel="結束那堂課，開始新的課"
+            onConfirm={async () => {
+              await api("POST", `/lessons/${active.id}/end`);
+              await start();
+            }}
+            onClose={() => setConfirmEnd(false)}
+          />
+        )}
+      </main>
+    </>
   );
 }
 
@@ -174,7 +174,7 @@ export function LessonPage({ id }: { id: string }) {
   const currentId = lesson?.currentQuestionId;
   useEffect(() => setFocusId(null), [currentId]);
 
-  if (!lesson) return <Loading error={loadError} />;
+  if (!lesson) return <Loading error={loadError} bare />;
   if (lesson.status === "ended") {
     return (
       <main class="page narrow stack">

@@ -8,15 +8,15 @@
 - Phase 4：上課紀錄（班級頁分頁、首頁「最近上課」）、學生成績表、每題統計、題目詳情、依分組看、簡答批改、學生歷次表現、單堂與多堂 Excel 匯出。計分規則在 `src/shared/records.ts`
 - Phase 5：簡答題上課互評（隨機、一人評一人、匿名、1～5 分＋評語、只供參考）。分配與檢查在 `src/shared/peer-review.ts`
 - Phase 6：上課小工具。開始上課可以「不用題組」、臨時出題（選擇／是非／簡答，公布時選正確答案或不計分）、抽人、計時器。臨時題規則在 `src/shared/quick.ts`
-- Phase 8（PR 待審）：搶答（伺服器決定倒數和名次，學生按只通知老師）、計時器時間到改成不出聲的大提示。搶答程式在 `src/worker/buzz.ts`、`src/teacher/buzz.tsx`、`src/student/buzz.tsx`。Phase 7（Word 匯入）暫緩
-- 正式網址：https://jushou.ryanaddy1102.workers.dev（老師端 `/t/`）。Phase 6 已部署，Phase 8 尚未部署
+- Phase 8：搶答（伺服器決定倒數和名次，學生按只通知老師）、計時器時間到改成不出聲的大提示。搶答程式在 `src/worker/buzz.ts`、`src/teacher/buzz.tsx`、`src/student/buzz.tsx`。Phase 7（Word 匯入）暫緩
+- Phase 9a（PR 待審）：新配色（灰藍底、白卡片）、按鈕三級、老師端頂部列＋麵包屑。顏色變數在 `src/shared/base.css`，`AppBar` 在 `src/teacher/ui.tsx`
+- 正式網址：https://jushou.ryanaddy1102.workers.dev（老師端 `/t/`）。Phase 8 已部署
 
 ## 下一步
-- 使用者 merge Phase 8 後部署（`pnpm run deploy` 會套用 `0009_buzzer` migration）
-- 下一階段：老師端、學生端介面整理
+- 9b：老師端各頁版面；9c：上課相關畫面；9d：學生端
 
 ## 使用者待辦
-- 審 Phase 8 PR；部署後用真的手機全班搶一次答，看手機上倒數是否大致同時結束（本機只用瀏覽器模擬測過）
+- 審 Phase 9a PR（附改前／改後截圖），merge 後自己決定是否部署
 
 ## 已知問題
 - 分組建立後才加入的學生，會出現在該分組的「未分組」區，要手動放進組裡

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { api } from "./api";
 import { go, href } from "./router";
-import { Confirm, ErrorText, Loading, Modal, Rename, useAction, useLoad } from "./ui";
+import { AppBar, Confirm, ErrorText, Loading, Modal, Rename, useAction, useLoad } from "./ui";
 import { groupCountFor } from "../shared/grouping";
 import { MAX_GROUP_NAME, MAX_GROUPING_NAME } from "../shared/limits";
 import type { ClassDetail, GroupingDetail, GroupingSummary, Student } from "../shared/types";
@@ -51,46 +51,46 @@ export function NewGrouping({ classId }: { classId: string }) {
   };
 
   return (
-    <main class="page narrow">
-      <a class="back" href={href(`/class/${classId}/groups`)}>
-        ← 回到 {cls.name}
-      </a>
-      <h1>新增分組</h1>
-      <form class="stack" onSubmit={submit}>
-        <div>
-          <label for="gname">分組名稱</label>
-          <input
-            id="gname"
-            class="field"
-            placeholder={defaultName}
-            maxLength={MAX_GROUPING_NAME}
-            value={name}
-            onInput={(e) => setName(e.currentTarget.value)}
-          />
-        </div>
-        <fieldset class="choices">
-          <legend>怎麼分？</legend>
-          <Choice checked={mode === "random"} onSelect={() => setMode("random")} title="隨機分組" text="電腦幫你平均分配" />
-          <Choice checked={mode === "manual"} onSelect={() => setMode("manual")} title="手動分組" text="自己決定誰在哪一組" />
-        </fieldset>
-        {mode === "random" && (
-          <fieldset class="choices choices-row">
-            <legend>依照</legend>
-            <Choice checked={splitBy === "count"} onSelect={() => setSplitBy("count")} title="分成幾組" />
-            <Choice checked={splitBy === "size"} onSelect={() => setSplitBy("size")} title="每組幾人" />
+    <>
+      <AppBar crumbs={[{ label: "首頁", href: href("/") }, { label: cls.name, href: href(`/class/${classId}/groups`) }, { label: "新增分組" }]} />
+      <main class="page narrow">
+        <h1>新增分組</h1>
+        <form class="stack" onSubmit={submit}>
+          <div>
+            <label for="gname">分組名稱</label>
+            <input
+              id="gname"
+              class="field"
+              placeholder={defaultName}
+              maxLength={MAX_GROUPING_NAME}
+              value={name}
+              onInput={(e) => setName(e.currentTarget.value)}
+            />
+          </div>
+          <fieldset class="choices">
+            <legend>怎麼分？</legend>
+            <Choice checked={mode === "random"} onSelect={() => setMode("random")} title="隨機分組" text="電腦幫你平均分配" />
+            <Choice checked={mode === "manual"} onSelect={() => setMode("manual")} title="手動分組" text="自己決定誰在哪一組" />
           </fieldset>
-        )}
-        <div>
-          <label for="num">{mode === "random" && splitBy === "size" ? "每組幾人" : "分成幾組"}</label>
-          <input id="num" class="field field-seat" inputMode="numeric" value={number} onInput={(e) => setNumber(e.currentTarget.value)} />
-        </div>
-        {hint && <p class={hint.startsWith("組數不能") || hint.startsWith("名冊") ? "error" : "muted"}>{hint}</p>}
-        <ErrorText message={error} />
-        <button class="btn btn-block" type="submit" disabled={busy || n === null}>
-          建立分組
-        </button>
-      </form>
-    </main>
+          {mode === "random" && (
+            <fieldset class="choices choices-row">
+              <legend>依照</legend>
+              <Choice checked={splitBy === "count"} onSelect={() => setSplitBy("count")} title="分成幾組" />
+              <Choice checked={splitBy === "size"} onSelect={() => setSplitBy("size")} title="每組幾人" />
+            </fieldset>
+          )}
+          <div>
+            <label for="num">{mode === "random" && splitBy === "size" ? "每組幾人" : "分成幾組"}</label>
+            <input id="num" class="field field-seat" inputMode="numeric" value={number} onInput={(e) => setNumber(e.currentTarget.value)} />
+          </div>
+          {hint && <p class={hint.startsWith("組數不能") || hint.startsWith("名冊") ? "error" : "muted"}>{hint}</p>}
+          <ErrorText message={error} />
+          <button class="btn btn-block" type="submit" disabled={busy || n === null}>
+            建立分組
+          </button>
+        </form>
+      </main>
+    </>
   );
 }
 
@@ -145,165 +145,165 @@ export function GroupingPage({ id }: { id: string }) {
     });
 
   return (
-    <main class="page">
-      <a class="back" href={href(`/class/${g.classId}/groups`)}>
-        ← 回到 {g.className}
-      </a>
-      <header class="topbar">
-        <h1>{g.name}</h1>
-        <a class="btn" href={href(`/grouping/${g.id}/show`)} onClick={enterFullscreen}>
-          投影顯示
-        </a>
-      </header>
-      <p class="muted">點學生可以換組，點組名可以改名或刪除這一組。</p>
-      <ErrorText message={action.error} />
+    <>
+      <AppBar crumbs={[{ label: "首頁", href: href("/") }, { label: g.className, href: href(`/class/${g.classId}/groups`) }, { label: g.name }]} />
+      <main class="page">
+        <header class="topbar">
+          <h1>{g.name}</h1>
+          <a class="btn" href={href(`/grouping/${g.id}/show`)} onClick={enterFullscreen}>
+            投影顯示
+          </a>
+        </header>
+        <p class="muted">點學生可以換組，點組名可以改名或刪除這一組。</p>
+        <ErrorText message={action.error} />
 
-      <div class="group-grid">
-        {g.groups.map((group) => (
-          <section key={group.id} class="card group">
-            <button class="group-name" onClick={() => setDialog({ kind: "group", id: group.id, name: group.name, size: group.studentIds.length })}>
-              {group.name}
-              <span class="muted">{group.studentIds.length} 人</span>
-            </button>
-            {group.studentIds.length === 0 && <p class="muted">還沒有人</p>}
-            {group.studentIds.map((sid) => {
-              const s = byId.get(sid)!;
-              return (
-                <button key={sid} class="member" onClick={() => setDialog({ kind: "student", student: s, groupId: group.id })}>
+        <div class="group-grid">
+          {g.groups.map((group) => (
+            <section key={group.id} class="card group">
+              <button class="group-name" onClick={() => setDialog({ kind: "group", id: group.id, name: group.name, size: group.studentIds.length })}>
+                {group.name}
+                <span class="muted">{group.studentIds.length} 人</span>
+              </button>
+              {group.studentIds.length === 0 && <p class="muted">還沒有人</p>}
+              {group.studentIds.map((sid) => {
+                const s = byId.get(sid)!;
+                return (
+                  <button key={sid} class="member" onClick={() => setDialog({ kind: "student", student: s, groupId: group.id })}>
+                    {s.seat} {s.name}
+                  </button>
+                );
+              })}
+            </section>
+          ))}
+        </div>
+
+        <button class="btn btn-secondary" disabled={action.busy} onClick={addGroup}>
+          ＋ 新增一組
+        </button>
+
+        {unplaced.length > 0 && (
+          <section class="card unplaced tools">
+            <h2>未分組（{unplaced.length} 人）</h2>
+            <div class="member-wrap">
+              {unplaced.map((s) => (
+                <button key={s.id} class="member" onClick={() => setDialog({ kind: "student", student: s, groupId: null })}>
                   {s.seat} {s.name}
                 </button>
-              );
-            })}
-          </section>
-        ))}
-      </div>
-
-      <button class="btn btn-secondary" disabled={action.busy} onClick={addGroup}>
-        ＋ 新增一組
-      </button>
-
-      {unplaced.length > 0 && (
-        <section class="card unplaced tools">
-          <h2>未分組（{unplaced.length} 人）</h2>
-          <div class="member-wrap">
-            {unplaced.map((s) => (
-              <button key={s.id} class="member" onClick={() => setDialog({ kind: "student", student: s, groupId: null })}>
-                {s.seat} {s.name}
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <div class="row tools">
-        <button class="btn btn-secondary" onClick={() => setDialog({ kind: "rename" })}>
-          改分組名稱
-        </button>
-        <button class="btn btn-secondary" disabled={g.groups.length === 0} onClick={() => setDialog({ kind: "shuffle" })}>
-          重新隨機
-        </button>
-        <button class="btn btn-secondary" disabled={action.busy} onClick={copy}>
-          複製這套分組
-        </button>
-        <button class="btn btn-secondary" onClick={() => setDialog({ kind: "delete" })}>
-          刪除
-        </button>
-      </div>
-
-      {dialog?.kind === "student" && (
-        <Modal title={`${dialog.student.seat} 號 ${dialog.student.name}`} onClose={close}>
-          <div class="stack">
-            {g.groups
-              .filter((x) => x.id !== dialog.groupId)
-              .map((x) => (
-                <button key={x.id} class="btn btn-block" disabled={action.busy} onClick={() => move(dialog.student.id, x.id)}>
-                  移到{x.name}
-                </button>
               ))}
-            {dialog.groupId && (
-              <button class="btn btn-secondary btn-block" disabled={action.busy} onClick={() => move(dialog.student.id, null)}>
-                移出分組
-              </button>
-            )}
-            <button class="btn btn-secondary btn-block" onClick={close}>
-              取消
-            </button>
-          </div>
-        </Modal>
-      )}
-      {dialog?.kind === "group" && (
-        <Rename
-          title="修改組名"
-          label="組名"
-          value={dialog.name}
-          maxLength={MAX_GROUP_NAME}
-          onSave={async (name) => {
-            await api("PATCH", `/groups/${dialog.id}`, { name });
-            reload();
-          }}
-          onClose={close}
-        >
-          <button class="btn btn-secondary btn-block" type="button" onClick={() => setDialog({ ...dialog, kind: "delete-group" })}>
-            刪除這一組
+            </div>
+          </section>
+        )}
+
+        <div class="row tools">
+          <button class="btn btn-secondary" onClick={() => setDialog({ kind: "rename" })}>
+            改分組名稱
           </button>
-        </Rename>
-      )}
-      {dialog?.kind === "delete-group" && (
-        <Confirm
-          title={`刪除「${dialog.name}」？`}
-          message={
-            dialog.size > 0
-              ? `這一組的 ${dialog.size} 位組員會回到「未分組」，學生不會被刪除。`
-              : "這一組會被刪除。"
-          }
-          confirmLabel="刪除這一組"
-          danger
-          onConfirm={async () => {
-            await api("DELETE", `/groups/${dialog.id}`);
-            reload();
-          }}
-          onClose={close}
-        />
-      )}
-      {dialog?.kind === "rename" && (
-        <Rename
-          title="修改分組名稱"
-          label="分組名稱"
-          value={g.name}
-          maxLength={MAX_GROUPING_NAME}
-          onSave={async (name) => {
-            await api("PATCH", `/groupings/${g.id}`, { name });
-            reload();
-          }}
-          onClose={close}
-        />
-      )}
-      {dialog?.kind === "shuffle" && (
-        <Confirm
-          title="重新隨機分組？"
-          message={`全班 ${g.students.length} 人會重新平均分到這 ${g.groups.length} 組，現在的分法會被取代。組名不會變。`}
-          confirmLabel="重新隨機"
-          onConfirm={async () => {
-            await api("POST", `/groupings/${g.id}/shuffle`);
-            reload();
-          }}
-          onClose={close}
-        />
-      )}
-      {dialog?.kind === "delete" && (
-        <Confirm
-          title={`刪除「${g.name}」？`}
-          message="這套分組會被刪除，無法復原。學生名冊和其他分組不受影響。"
-          confirmLabel="刪除這套分組"
-          danger
-          onConfirm={async () => {
-            await api("DELETE", `/groupings/${g.id}`);
-            location.replace(href(`/class/${g.classId}/groups`));
-          }}
-          onClose={close}
-        />
-      )}
-    </main>
+          <button class="btn btn-secondary" disabled={g.groups.length === 0} onClick={() => setDialog({ kind: "shuffle" })}>
+            重新隨機
+          </button>
+          <button class="btn btn-secondary" disabled={action.busy} onClick={copy}>
+            複製這套分組
+          </button>
+          <button class="btn btn-secondary" onClick={() => setDialog({ kind: "delete" })}>
+            刪除
+          </button>
+        </div>
+
+        {dialog?.kind === "student" && (
+          <Modal title={`${dialog.student.seat} 號 ${dialog.student.name}`} onClose={close}>
+            <div class="stack">
+              {g.groups
+                .filter((x) => x.id !== dialog.groupId)
+                .map((x) => (
+                  <button key={x.id} class="btn btn-block" disabled={action.busy} onClick={() => move(dialog.student.id, x.id)}>
+                    移到{x.name}
+                  </button>
+                ))}
+              {dialog.groupId && (
+                <button class="btn btn-secondary btn-block" disabled={action.busy} onClick={() => move(dialog.student.id, null)}>
+                  移出分組
+                </button>
+              )}
+              <button class="btn btn-secondary btn-block" onClick={close}>
+                取消
+              </button>
+            </div>
+          </Modal>
+        )}
+        {dialog?.kind === "group" && (
+          <Rename
+            title="修改組名"
+            label="組名"
+            value={dialog.name}
+            maxLength={MAX_GROUP_NAME}
+            onSave={async (name) => {
+              await api("PATCH", `/groups/${dialog.id}`, { name });
+              reload();
+            }}
+            onClose={close}
+          >
+            <button class="btn btn-secondary btn-block" type="button" onClick={() => setDialog({ ...dialog, kind: "delete-group" })}>
+              刪除這一組
+            </button>
+          </Rename>
+        )}
+        {dialog?.kind === "delete-group" && (
+          <Confirm
+            title={`刪除「${dialog.name}」？`}
+            message={
+              dialog.size > 0
+                ? `這一組的 ${dialog.size} 位組員會回到「未分組」，學生不會被刪除。`
+                : "這一組會被刪除。"
+            }
+            confirmLabel="刪除這一組"
+            danger
+            onConfirm={async () => {
+              await api("DELETE", `/groups/${dialog.id}`);
+              reload();
+            }}
+            onClose={close}
+          />
+        )}
+        {dialog?.kind === "rename" && (
+          <Rename
+            title="修改分組名稱"
+            label="分組名稱"
+            value={g.name}
+            maxLength={MAX_GROUPING_NAME}
+            onSave={async (name) => {
+              await api("PATCH", `/groupings/${g.id}`, { name });
+              reload();
+            }}
+            onClose={close}
+          />
+        )}
+        {dialog?.kind === "shuffle" && (
+          <Confirm
+            title="重新隨機分組？"
+            message={`全班 ${g.students.length} 人會重新平均分到這 ${g.groups.length} 組，現在的分法會被取代。組名不會變。`}
+            confirmLabel="重新隨機"
+            onConfirm={async () => {
+              await api("POST", `/groupings/${g.id}/shuffle`);
+              reload();
+            }}
+            onClose={close}
+          />
+        )}
+        {dialog?.kind === "delete" && (
+          <Confirm
+            title={`刪除「${g.name}」？`}
+            message="這套分組會被刪除，無法復原。學生名冊和其他分組不受影響。"
+            confirmLabel="刪除這套分組"
+            danger
+            onConfirm={async () => {
+              await api("DELETE", `/groupings/${g.id}`);
+              location.replace(href(`/class/${g.classId}/groups`));
+            }}
+            onClose={close}
+          />
+        )}
+      </main>
+    </>
   );
 }
 
@@ -349,7 +349,7 @@ export function Projection({ id }: { id: string }) {
     };
   }, [id]);
 
-  if (!g) return <Loading error={error} />;
+  if (!g) return <Loading error={error} bare />;
   const byId = new Map(g.students.map((s) => [s.id, s]));
   const most = Math.max(1, ...g.groups.map((x) => x.studentIds.length));
   // Shrink the text when there are many groups or big groups, so it fits one screen.
