@@ -12,7 +12,7 @@ export function Roster({ cls, reload }: { cls: ClassDetail; reload: () => void }
 
   return (
     <section>
-      <div class="section-head">
+      <div class="section-head roster-wrap">
         <h2>學生名冊（{cls.students.length} 人）</h2>
         {!pasting && (
           <button class="btn btn-secondary" onClick={() => (setPasting(true), setNotice(""))}>

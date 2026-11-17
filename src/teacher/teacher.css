@@ -538,7 +538,7 @@ td .badge { margin-left: var(--space-1); }
 .score-button { min-width: 72px; min-height: 72px; font-size: 28px; }
 .score-input { width: 8em; font-size: 28px; }
 .big-text { font-size: 26px; font-weight: 700; }
-.table a { color: var(--text); text-decoration: none; }
+.table a { color: var(--primary); text-decoration: none; }
 .table a:hover { text-decoration: underline; }
 .table a:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
 .roster-wrap { max-width: 800px; }

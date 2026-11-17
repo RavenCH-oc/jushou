@@ -33,6 +33,7 @@
   /* 停用的按鈕 */
   --disabled: #c3cad5;
   --disabled-text: #4a5260;
+  --disabled-text-light: #98a1af; /* disabled text buttons */
 
   /* 長條圖一般選項 */
   --chart: #6b7a99;
@@ -135,7 +136,7 @@ p { margin: 0 0 var(--space-2); }
   border-color: var(--border);
   color: var(--disabled-text);
 }
-.btn-text:disabled, .btn-text:disabled:hover { background: none; color: var(--disabled-text); cursor: default; }
+.btn-text:disabled, .btn-text:disabled:hover { background: none; color: var(--disabled-text-light); cursor: default; }
 
 .field {
   display: block;
