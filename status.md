@@ -9,14 +9,15 @@
 - Phase 5：簡答題上課互評（隨機、一人評一人、匿名、1～5 分＋評語、只供參考）。分配與檢查在 `src/shared/peer-review.ts`
 - Phase 6：上課小工具。開始上課可以「不用題組」、臨時出題（選擇／是非／簡答，公布時選正確答案或不計分）、抽人、計時器。臨時題規則在 `src/shared/quick.ts`
 - Phase 8：搶答（伺服器決定倒數和名次，學生按只通知老師）、計時器時間到改成不出聲的大提示。搶答程式在 `src/worker/buzz.ts`、`src/teacher/buzz.tsx`、`src/student/buzz.tsx`。Phase 7（Word 匯入）暫緩
-- Phase 9a（PR 待審）：新配色（灰藍底、白卡片）、按鈕三級、老師端頂部列＋麵包屑。顏色變數在 `src/shared/base.css`，`AppBar` 在 `src/teacher/ui.tsx`
-- 正式網址：https://jushou.ryanaddy1102.workers.dev（老師端 `/t/`）。Phase 8 已部署
+- Phase 9a：新配色（灰藍底、白卡片）、按鈕三級、老師端頂部列＋麵包屑。顏色變數在 `src/shared/base.css`，`AppBar` 在 `src/teacher/ui.tsx`
+- Phase 9b（PR 待審）：老師端一般頁面重新排版（列表卡片、文字按鈕、數字卡、「？」說明 `useHelp`）
+- 正式網址：https://jushou.ryanaddy1102.workers.dev（老師端 `/t/`）。Phase 9a 已部署
 
 ## 下一步
-- 9b：老師端各頁版面；9c：上課相關畫面；9d：學生端
+- 9c：開始上課、上課畫面、投影、小工具、搶答、互評；9d：學生端
 
 ## 使用者待辦
-- 審 Phase 9a PR（附改前／改後截圖），merge 後自己決定是否部署
+- 審 Phase 9b PR（附改前／改後截圖），merge 後自己決定是否部署
 
 ## 已知問題
 - 分組建立後才加入的學生，會出現在該分組的「未分組」區，要手動放進組裡

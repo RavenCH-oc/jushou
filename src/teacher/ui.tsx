@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { useCallback, useEffect, useState } from "preact/hooks";
+import { useCallback, useEffect, useId, useState } from "preact/hooks";
 
 // Load data for a page; `reload` re-fetches after a change.
 export function useLoad<T>(load: () => Promise<T>, deps: unknown[]) {
@@ -51,7 +51,27 @@ export function Loading({ error, bare }: { error: string; bare?: boolean }) {
   );
 }
 
-export type Crumb = { label: string; href?: string };
+// A small 「？」 button that shows/hides a short explanation (tap, not hover).
+// The button and the text go in different places (button next to a title,
+// text under that row), so this returns both.
+export function useHelp(label: string, text: ComponentChildren) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  return {
+    button: (
+      <button type="button" class="help-button" aria-label={label} aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>
+        ？
+      </button>
+    ),
+    text: (
+      <p id={id} class="help-text" hidden={!open}>
+        {text}
+      </p>
+    ),
+  };
+}
+
+export type Crumb ={ label: string; href?: string };
 
 // Dark bar on top of every normal teacher page: 舉手 › 首頁 › … › this page.
 // The last crumb is the current page (not a link). Narrow screens show only

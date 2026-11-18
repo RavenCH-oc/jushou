@@ -39,11 +39,18 @@ export function SetPage({ id }: { id: string }) {
     <>
       <AppBar crumbs={[{ label: "首頁", href: href("/") }, { label: set.name }]} />
       <main class="page">
-        <h1>{set.name}</h1>
         <div class="section-head">
-          <p class="muted set-total">
-            共 {set.questions.length} 題，總分 {total} 分
-          </p>
+          <div>
+            <div class="title-row">
+              <h1>{set.name}</h1>
+              <button class="btn-text" onClick={() => setDialog({ kind: "rename" })}>
+                ✎ 改名
+              </button>
+            </div>
+            <p class="muted title-sub">
+              共 {set.questions.length} 題，總分 {total} 分
+            </p>
+          </div>
           {set.questions.length > 0 && (
             <a class="btn btn-secondary" href={href(`/set/${set.id}/preview`)}>
               預覽全部
@@ -52,61 +59,62 @@ export function SetPage({ id }: { id: string }) {
         </div>
         <ErrorText message={action.error} />
 
-        {set.questions.length === 0 ? (
-          <p class="muted">這個題組還沒有題目</p>
-        ) : (
-          <ol class="question-list">
-            {set.questions.map((q, i) => (
-              <li key={q.id} class="card question-item">
-                <p class="question-head">
-                  <strong>第 {i + 1} 題</strong>
-                  <span class="muted">
-                    {typeLabel(q.type)}・{q.points} 分
-                  </span>
-                </p>
-                <p class="question-snippet">{snippet(q.text)}</p>
-                <div class="row">
-                  <a class="btn btn-secondary btn-small" href={href(`/set/${set.id}/q/${q.id}`)}>
-                    修改
-                  </a>
-                  <button class="btn btn-secondary btn-small" disabled={action.busy} onClick={() => change("POST", `/questions/${q.id}/copy`)}>
-                    複製
-                  </button>
-                  <button
-                    class="btn btn-secondary btn-small"
-                    disabled={action.busy || i === 0}
-                    onClick={() => change("POST", `/questions/${q.id}/move`, { direction: "up" })}
-                  >
-                    上移
-                  </button>
-                  <button
-                    class="btn btn-secondary btn-small"
-                    disabled={action.busy || i === set.questions.length - 1}
-                    onClick={() => change("POST", `/questions/${q.id}/move`, { direction: "down" })}
-                  >
-                    下移
-                  </button>
-                  <button class="btn btn-secondary btn-small" onClick={() => setDialog({ kind: "delete-question", q, number: i + 1 })}>
-                    刪除
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
+        <div class="card panel">
+          {set.questions.length === 0 ? (
+            <p class="panel-empty">這個題組還沒有題目</p>
+          ) : (
+            <ol class="list">
+              {set.questions.map((q, i) => (
+                <li key={q.id} class="list-row question-row">
+                  <div class="list-main">
+                    <p class="question-head">
+                      <strong>第 {i + 1} 題</strong>
+                      <span class="muted">
+                        {typeLabel(q.type)}・{q.points} 分
+                      </span>
+                    </p>
+                    <p class="question-snippet">{snippet(q.text)}</p>
+                  </div>
+                  <div class="question-actions">
+                    <button class="btn-text" disabled={action.busy} onClick={() => change("POST", `/questions/${q.id}/copy`)}>
+                      複製
+                    </button>
+                    <button
+                      class="btn-text"
+                      disabled={action.busy || i === 0}
+                      onClick={() => change("POST", `/questions/${q.id}/move`, { direction: "up" })}
+                    >
+                      上移
+                    </button>
+                    <button
+                      class="btn-text"
+                      disabled={action.busy || i === set.questions.length - 1}
+                      onClick={() => change("POST", `/questions/${q.id}/move`, { direction: "down" })}
+                    >
+                      下移
+                    </button>
+                    <button class="btn-text btn-text-danger" onClick={() => setDialog({ kind: "delete-question", q, number: i + 1 })}>
+                      刪除
+                    </button>
+                    <a class="btn btn-secondary btn-small" href={href(`/set/${set.id}/q/${q.id}`)}>
+                      修改
+                    </a>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
         {/* Right under the last question, where the new one will appear. */}
         <button class="btn btn-block add-question" onClick={() => setDialog({ kind: "add" })}>
           ＋ 新增第 {set.questions.length + 1} 題
         </button>
 
-        <div class="row tools">
-          <button class="btn btn-secondary" onClick={() => setDialog({ kind: "rename" })}>
-            改題組名稱
-          </button>
-          <button class="btn btn-secondary" disabled={action.busy} onClick={copySet}>
+        <div class="row row-tight tools">
+          <button class="btn-text" disabled={action.busy} onClick={copySet}>
             複製整個題組
           </button>
-          <button class="btn btn-secondary" onClick={() => setDialog({ kind: "delete" })}>
+          <button class="btn-text btn-text-danger" onClick={() => setDialog({ kind: "delete" })}>
             刪除題組
           </button>
         </div>
@@ -115,7 +123,7 @@ export function SetPage({ id }: { id: string }) {
           <Modal title="要新增哪一種題目？" onClose={close}>
             <div class="type-picker">
               {QUESTION_TYPES.map((t) => (
-                <a key={t.type} class="btn btn-block type-button" href={href(`/set/${set.id}/add/${t.type}`)}>
+                <a key={t.type} class="btn btn-secondary btn-block type-button" href={href(`/set/${set.id}/add/${t.type}`)}>
                   <span>{t.label}</span>
                   <span class="type-desc">{t.description}</span>
                 </a>
