@@ -1,3 +1,4 @@
+import type { ComponentChild } from "preact";
 import { useState } from "preact/hooks";
 import { api } from "./api";
 import { go, href } from "./router";
@@ -60,32 +61,30 @@ export function Home({ onLogout }: { onLogout: () => void }) {
           </section>
         )}
         <div class="home-cols">
-          <div class="home-col">
-            <section class="card panel">
-              <div class="panel-head">
-                <h2>班級</h2>
-                <a class="btn btn-secondary btn-small" href={href("/new")}>
-                  新增班級
-                </a>
-              </div>
-              {classes.length === 0 ? (
-                <p class="panel-empty">還沒有班級。按「新增班級」開始。</p>
-              ) : (
-                <ul class="list">
-                  {classes.map((c) => (
-                    <li key={c.id}>
-                      <a class="list-row" href={href(`/class/${c.id}`)}>
-                        <strong class="list-main">{c.name}</strong>
-                        <span class="list-meta">{c.studentCount} 位學生</span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-            <RecentRecords list={recent} />
-          </div>
-          <section class="card panel">
+          <RecentRecords list={recent} />
+          <section class="card panel home-card">
+            <div class="panel-head">
+              <h2>班級</h2>
+              <a class="btn btn-secondary btn-small" href={href("/new")}>
+                新增班級
+              </a>
+            </div>
+            {classes.length === 0 ? (
+              <p class="panel-empty">還沒有班級。按「新增班級」開始。</p>
+            ) : (
+              <Capped
+                items={classes}
+                noun="個班級"
+                row={(c) => (
+                  <a class="list-row" href={href(`/class/${c.id}`)}>
+                    <strong class="list-main truncate">{c.name}</strong>
+                    <span class="list-meta">{c.studentCount} 位學生</span>
+                  </a>
+                )}
+              />
+            )}
+          </section>
+          <section class="card panel home-card">
             <div class="panel-head">
               <h2>題組</h2>
               <a class="btn btn-secondary btn-small" href={href("/new-set")}>
@@ -95,22 +94,44 @@ export function Home({ onLogout }: { onLogout: () => void }) {
             {sets.length === 0 ? (
               <p class="panel-empty">還沒有題組。按「新增題組」開始出題。</p>
             ) : (
-              <ul class="list">
-                {sets.map((s) => (
-                  <li key={s.id}>
-                    <a class="list-row" href={href(`/set/${s.id}`)}>
-                      <strong class="list-main">{s.name}</strong>
-                      <span class="list-meta">
-                        {s.questionCount} 題・{formatTime(s.updatedAt)} 修改
-                      </span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
+              <Capped
+                items={sets}
+                noun="個題組"
+                row={(s) => (
+                  <a class="list-row" href={href(`/set/${s.id}`)}>
+                    <span class="list-main">
+                      <strong class="truncate">{s.name}</strong>
+                      <span class="muted list-sub truncate">{formatTime(s.updatedAt)} 修改</span>
+                    </span>
+                    <span class="list-meta">{s.questionCount} 題</span>
+                  </a>
+                )}
+              />
             )}
           </section>
         </div>
       </main>
+    </>
+  );
+}
+
+const SHOWN = 5;
+
+// The first 5 rows, plus a button at the card's bottom to show/hide the rest.
+function Capped<T extends { id: string }>({ items, noun, row }: { items: T[]; noun: string; row: (item: T) => ComponentChild }) {
+  const [all, setAll] = useState(false);
+  return (
+    <>
+      <ul class="list">
+        {(all ? items : items.slice(0, SHOWN)).map((x) => (
+          <li key={x.id}>{row(x)}</li>
+        ))}
+      </ul>
+      {items.length > SHOWN && (
+        <button class="btn-text panel-more" aria-expanded={all} onClick={() => setAll(!all)}>
+          {all ? `只顯示 ${SHOWN} 個` : `顯示全部 ${items.length} ${noun}`}
+        </button>
+      )}
     </>
   );
 }

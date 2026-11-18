@@ -24,6 +24,8 @@
   --appbar: #1f2b3e;
   --appbar-text: #fff;
   --appbar-muted: #b8c3d4;
+  --appbar-link-bg: rgba(255, 255, 255, 0.14);   /* breadcrumb buttons */
+  --appbar-link-hover: rgba(255, 255, 255, 0.24);
 
   /* 狀態：文字色＋柔和底色成對使用 */
   --success: #1b6b3a;  --success-soft: #e1f2e7;
