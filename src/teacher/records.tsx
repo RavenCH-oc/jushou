@@ -37,8 +37,8 @@ import {
 } from "../shared/records";
 import type { ClassDetail, GroupingDetail } from "../shared/types";
 
-function Ungraded({ n }: { n: number }) {
-  return n ? <span class="badge">{n} 份簡答沒批改</span> : null;
+function Ungraded({ n, short }: { n: number; short?: boolean }) {
+  return n ? <span class="badge">{short ? `${n} 份未批改` : `${n} 份簡答沒批改`}</span> : null;
 }
 
 // --- 班級頁「上課紀錄」分頁 ---
@@ -173,11 +173,14 @@ export function RecentRecords({ list }: { list: LessonSummary[] }) {
                 <strong class="truncate">
                   {l.className}・{l.setName}
                 </strong>
-                <span class="muted list-sub truncate">
-                  {formatTaipei(l.startedAt)}・出席 {l.present}／{l.total}
+                <span class="muted list-sub">
+                  <span class="nowrap">{formatTaipei(l.startedAt)}</span>・
+                  <span class="nowrap">
+                    出席 {l.present}／{l.total}
+                  </span>
                 </span>
               </span>
-              <Ungraded n={l.ungraded} />
+              <Ungraded n={l.ungraded} short />
             </a>
           </li>
         ))}

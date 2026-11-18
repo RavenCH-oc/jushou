@@ -163,6 +163,7 @@ a.list-row:focus-visible { outline: 3px solid var(--primary); outline-offset: -3
 .panel-more:focus-visible { outline-offset: -3px; }
 .panel-foot { margin-bottom: 0; padding: 12px var(--space-3); color: var(--text-muted); font-size: var(--fs-small); }
 .truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nowrap { white-space: nowrap; }
 .list-sub { font-size: var(--fs-small); }
 .list-meta { flex: none; white-space: nowrap; }
 
