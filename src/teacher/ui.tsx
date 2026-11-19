@@ -1,5 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useCallback, useEffect, useId, useState } from "preact/hooks";
+import { href } from "./router";
 
 // Load data for a page; `reload` re-fetches after a change.
 export function useLoad<T>(load: () => Promise<T>, deps: unknown[]) {
@@ -80,7 +81,13 @@ export function AppBar({ crumbs = [], children }: { crumbs?: Crumb[]; children?:
   const parent = crumbs.length > 1 ? crumbs[crumbs.length - 2] : null;
   return (
     <header class="appbar">
-      <span class="appbar-name">舉手</span>
+      {crumbs.length ? (
+        <a class="appbar-name" href={href("/")}>
+          舉手
+        </a>
+      ) : (
+        <span class="appbar-name">舉手</span>
+      )}
       {crumbs.length > 0 && (
         <nav class="crumbs" aria-label="目前位置">
           <ol>

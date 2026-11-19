@@ -37,8 +37,8 @@ import {
 } from "../shared/records";
 import type { ClassDetail, GroupingDetail } from "../shared/types";
 
-function Ungraded({ n }: { n: number }) {
-  return n ? <span class="badge">{n} 份簡答沒批改</span> : null;
+function Ungraded({ n, short }: { n: number; short?: boolean }) {
+  return n ? <span class="badge">{short ? `${n} 份未批改` : `${n} 份簡答沒批改`}</span> : null;
 }
 
 // --- 班級頁「上課紀錄」分頁 ---
@@ -159,29 +159,33 @@ function ExportDialog({ className, list, onClose }: { className: string; list: L
 // --- 首頁「最近上課」 ---
 
 export function RecentRecords({ list }: { list: LessonSummary[] }) {
-  if (!list.length) return null;
   return (
-    <section class="card panel">
+    <section class="card panel home-card">
       <div class="panel-head">
         <h2>最近上課</h2>
       </div>
+      {list.length === 0 && <p class="panel-empty">還沒有上課紀錄。上完第一堂課會出現在這裡。</p>}
       <ul class="list">
         {list.map((l) => (
           <li key={l.id}>
             <a class="list-row" href={href(`/record/${l.id}`)}>
               <span class="list-main">
-                <strong>
+                <strong class="truncate">
                   {l.className}・{l.setName}
                 </strong>
-                <span class="muted">
-                  {formatTaipei(l.startedAt)}・出席 {l.present}／{l.total}
+                <span class="muted list-sub">
+                  <span class="nowrap">{formatTaipei(l.startedAt)}</span>・
+                  <span class="nowrap">
+                    出席 {l.present}／{l.total}
+                  </span>
                 </span>
               </span>
-              <Ungraded n={l.ungraded} />
+              <Ungraded n={l.ungraded} short />
             </a>
           </li>
         ))}
       </ul>
+      <p class="panel-foot">各班的完整紀錄在班級頁</p>
     </section>
   );
 }
