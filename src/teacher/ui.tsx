@@ -1,6 +1,37 @@
-import type { ComponentChildren } from "preact";
+import type { ComponentChild, ComponentChildren } from "preact";
 import { useCallback, useEffect, useId, useState } from "preact/hooks";
 import { href } from "./router";
+
+const SHOWN = 5;
+
+// The first 5 items, plus a button under them to show/hide the rest.
+// `keepOpen`: show everything (e.g. the chosen item is past the first 5).
+export function Capped<T extends { id: string }>(props: {
+  items: T[];
+  noun: string; // 「顯示全部 14 個題組」
+  row: (item: T) => ComponentChild;
+  listClass?: string;
+  moreClass?: string;
+  keepOpen?: boolean;
+}) {
+  const [all, setAll] = useState(false);
+  const open = all || !!props.keepOpen;
+  const shown = open ? props.items : props.items.slice(0, SHOWN);
+  return (
+    <>
+      <ul class={props.listClass ?? "list"}>
+        {shown.map((x) => (
+          <li key={x.id}>{props.row(x)}</li>
+        ))}
+      </ul>
+      {props.items.length > SHOWN && !props.keepOpen && (
+        <button type="button" class={`btn-text ${props.moreClass ?? "panel-more"}`} aria-expanded={open} onClick={() => setAll(!open)}>
+          {open ? `只顯示 ${SHOWN} 個` : `顯示全部 ${props.items.length} ${props.noun}`}
+        </button>
+      )}
+    </>
+  );
+}
 
 // Load data for a page; `reload` re-fetches after a change.
 export function useLoad<T>(load: () => Promise<T>, deps: unknown[]) {

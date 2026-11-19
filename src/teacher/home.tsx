@@ -1,8 +1,7 @@
-import type { ComponentChild } from "preact";
 import { useState } from "preact/hooks";
 import { api } from "./api";
 import { go, href } from "./router";
-import { AppBar, ErrorText, formatTime, Loading, useAction, useLoad } from "./ui";
+import { AppBar, Capped, ErrorText, formatTime, Loading, useAction, useLoad } from "./ui";
 import { MAX_CLASS_NAME } from "../shared/limits";
 import { MAX_SET_NAME } from "../shared/questions";
 import type { ClassSummary, QuestionSetSummary } from "../shared/types";
@@ -111,27 +110,6 @@ export function Home({ onLogout }: { onLogout: () => void }) {
           </section>
         </div>
       </main>
-    </>
-  );
-}
-
-const SHOWN = 5;
-
-// The first 5 rows, plus a button at the card's bottom to show/hide the rest.
-function Capped<T extends { id: string }>({ items, noun, row }: { items: T[]; noun: string; row: (item: T) => ComponentChild }) {
-  const [all, setAll] = useState(false);
-  return (
-    <>
-      <ul class="list">
-        {(all ? items : items.slice(0, SHOWN)).map((x) => (
-          <li key={x.id}>{row(x)}</li>
-        ))}
-      </ul>
-      {items.length > SHOWN && (
-        <button class="btn-text panel-more" aria-expanded={all} onClick={() => setAll(!all)}>
-          {all ? `只顯示 ${SHOWN} 個` : `顯示全部 ${items.length} ${noun}`}
-        </button>
-      )}
     </>
   );
 }

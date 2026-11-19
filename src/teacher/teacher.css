@@ -28,7 +28,7 @@ a.appbar-name:hover { text-decoration: underline; }
 .crumbs li > *, .crumb-up { overflow: hidden; text-overflow: ellipsis; max-width: 16em; }
 .crumbs li:last-child { flex-shrink: 1000; } /* shrink the current page's name first */
 /* Links look like faint buttons: 44px tall to tap, ~32px of visible background. */
-.crumbs a {
+.crumbs a, .appbar-link {
   position: relative;
   z-index: 0;
   display: block;
@@ -37,11 +37,11 @@ a.appbar-name:hover { text-decoration: underline; }
   color: var(--appbar-text);
   text-decoration: none;
 }
-.crumbs a::before { content: ""; position: absolute; z-index: -1; inset: 6px 0; border-radius: var(--radius-sm); background: var(--appbar-link-bg); }
-.crumbs a:hover::before { background: var(--appbar-link-hover); }
+.crumbs a::before, .appbar-link::before { content: ""; position: absolute; z-index: -1; inset: 6px 0; border-radius: var(--radius-sm); background: var(--appbar-link-bg); }
+.crumbs a:hover::before, .appbar-link:hover::before { background: var(--appbar-link-hover); }
 .crumbs [aria-current] { color: var(--appbar-text); }
 .crumbs .crumb-up { display: none; }
-.appbar a:focus-visible, .appbar-button:focus-visible { outline: 3px solid var(--appbar-text); outline-offset: 2px; }
+.appbar a:focus-visible, .appbar-button:focus-visible, .lesson-appbar a:focus-visible { outline: 3px solid var(--appbar-text); outline-offset: 2px; }
 .appbar-actions { flex: none; display: flex; gap: var(--space-1); margin-left: auto; padding-left: var(--space-2); }
 .appbar-button {
   min-height: 44px;
@@ -58,21 +58,6 @@ a.appbar-name:hover { text-decoration: underline; }
   .appbar { padding: 0 var(--space-2); }
   .crumbs ol { display: none; }
   .crumbs .crumb-up { display: block; margin-left: 12px; }
-}
-
-/* 「← 回首頁」on the lesson screen (other pages use the AppBar). */
-.back {
-  display: inline-flex;
-  align-items: center;
-  min-height: 48px;
-  margin-bottom: var(--space-2);
-  padding: 0 var(--space-2);
-  font-size: var(--fs-body);
-  color: var(--primary);
-  text-decoration: none;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: var(--surface);
 }
 
 .topbar,
@@ -283,7 +268,7 @@ a.list-row:focus-visible { outline: 3px solid var(--primary); outline-offset: -3
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 22, 35, 0.55);
+  background: var(--overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -305,8 +290,8 @@ a.list-row:focus-visible { outline: 3px solid var(--primary); outline-offset: -3
 
 .projection {
   min-height: 100vh;
-  background: #fff;
-  color: #000;
+  background: var(--surface);
+  color: var(--text);
   padding: var(--space-3);
 }
 .projection-head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); }
@@ -316,10 +301,10 @@ a.list-row:focus-visible { outline: 3px solid var(--primary); outline-offset: -3
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: var(--space-3);
 }
-.projection-group { border: 3px solid #000; border-radius: var(--radius); padding: var(--space-2) var(--space-3); }
-.projection-group h2 { font-size: 1.15em; margin: 0 0 var(--space-1); border-bottom: 3px solid #000; }
+.projection-group { border: 2px solid var(--text); border-radius: var(--radius); padding: var(--space-2) var(--space-3); }
+.projection-group h2 { font-size: 1.15em; margin: 0 0 var(--space-1); border-bottom: 2px solid var(--border-strong); }
 .projection-group ul { list-style: none; margin: 0; padding: 0; line-height: 1.45; }
-.projection .seat { display: inline-block; min-width: 2em; font-variant-numeric: tabular-nums; color: #333; }
+.projection .seat { display: inline-block; min-width: 2em; font-variant-numeric: tabular-nums; color: var(--text-muted); }
 
 
 .row-center { align-items: center; }
@@ -388,51 +373,65 @@ a.list-row:focus-visible { outline: 3px solid var(--primary); outline-offset: -3
   font-weight: 700;
 }
 
-/* Lesson (上課): projected, so big text and high contrast. */
-.notice {
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--warning);
-  border-radius: var(--radius);
-  background: var(--warning-soft);
-  font-weight: 700;
+/* 開始上課: 「正在上課」, same look as the home page's 上課中 card. */
+.notice-card { margin-bottom: var(--space-3); background: var(--warning-soft); border-color: var(--warning); font-weight: 700; }
+.choices.card { padding: var(--space-3); }
+.choices.card legend { float: left; width: 100%; margin-bottom: var(--space-2); font-size: 22px; }
+.choices-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
+.choices-more { justify-self: start; }
+
+/* Lesson (上課): projected, so big text and high contrast. Projected things sit on white.
+   The screen uses the whole window; text grows with its width. */
+.lesson-appbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 56px;
+  padding: 0 2.5vw;
+  background: var(--appbar);
+  color: var(--appbar-text);
+  font-size: 18px;
+  white-space: nowrap;
 }
-/* The lesson screen uses the whole (projected) window; text grows with its width. */
-.lesson { padding: var(--space-2) 2.5vw; }
-/* Two rows: where we are (+ the timer, top right), then tools left and lesson controls right. */
-.lesson-bar { display: grid; gap: var(--space-1); margin-bottom: var(--space-2); }
-.lesson-head { display: flex; align-items: center; gap: var(--space-1) var(--space-2); min-height: 56px; }
-.lesson-head .back { margin: 0; }
-.lesson-tools { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-1) var(--space-2); }
+.lesson-appbar .appbar-link { flex: none; }
+.lesson-title { flex: 1 1 auto; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; font-size: clamp(20px, 1.6vw, 30px); font-weight: 400; }
+.lesson-appbar .appbar-actions { padding-left: 0; }
+.lesson-body { padding: 12px 2.5vw; }
+/* Tools on the left, the timer (when running) on the right. */
+.lesson-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-1) var(--space-2); margin-bottom: 12px; }
 .lesson-tools .row { align-items: center; gap: var(--space-1); }
-.lesson-title { margin: 0; font-size: clamp(24px, 1.8vw, 36px); }
+/* The stage: question, choices, results and the main button, on one white card. */
+.stage { padding: clamp(16px, 2vw, 32px); }
 .btn-main { min-height: clamp(64px, 5vw, 96px); padding: 0 var(--space-4); font-size: clamp(26px, 2vw, 40px); }
 .lesson-grid { display: grid; grid-template-columns: 20% minmax(0, 1fr); gap: var(--space-3); align-items: start; }
 @media (max-width: 800px) { .lesson-grid { grid-template-columns: 1fr; } .lesson-list { order: 2; } }
-.lesson-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.lesson-list { list-style: none; margin: 0; }
+.lesson-list > li + li { border-top: 1px solid var(--border); }
 .lesson-item {
   display: grid;
-  gap: 2px;
+  gap: 4px;
   width: 100%;
   min-height: 48px;
-  padding: 6px 12px;
+  padding: 8px 12px 8px 16px;
   font: inherit;
   font-size: clamp(17px, 1.1vw, 22px);
   text-align: left;
   color: var(--text);
   background: var(--surface);
-  border: 2px solid var(--border);
-  border-radius: var(--radius);
+  border: 0;
+  border-left: 4px solid transparent;
   cursor: pointer;
 }
-.lesson-item-on { border-color: var(--primary); box-shadow: inset 0 0 0 2px var(--primary); background: var(--primary-soft); font-weight: 700; }
-.lesson-status { font-size: 0.85em; font-weight: 400; color: var(--text-muted); }
-.status-open { color: var(--success); font-weight: 700; }
-.status-closed { color: var(--warning); font-weight: 700; }
-.status-revealed { color: var(--primary); }
-.status-reviewing { color: #7a3fb0; font-weight: 700; }
+.lesson-item:hover { background: var(--surface-soft); }
+.lesson-item:focus-visible { outline: 3px solid var(--primary); outline-offset: -3px; }
+.lesson-item-on, .lesson-item-on:hover { background: var(--primary-soft); border-left-color: var(--primary); font-weight: 700; }
+.lesson-item-tags { display: flex; flex-wrap: wrap; gap: 4px; font-weight: 400; }
+.lesson-item-tags .badge { font-size: 0.8em; }
+.lesson-pending { font-size: 0.85em; }
 .lesson-main { display: grid; gap: var(--space-2); }
 .lesson-main > p { margin: 0; }
 .lesson-meta { color: var(--text-muted); font-size: clamp(20px, 1.3vw, 28px); }
+.lesson-meta .badge { margin-left: var(--space-1); font-size: 0.8em; vertical-align: 2px; }
 .projected .qv { gap: clamp(12px, 1.2vw, 24px); }
 .projected .qv-text { font-size: clamp(32px, 3.2vw, 64px); line-height: 1.45; }
 .projected .qv-option { font-size: clamp(22px, 2vw, 40px); min-height: 1.9em; padding: 0.15em 0.6em; }
@@ -455,19 +454,22 @@ a.list-row:focus-visible { outline: 3px solid var(--primary); outline-offset: -3
 .join-code-huge { font-size: clamp(96px, 12vw, 240px); font-weight: 700; letter-spacing: 0.06em; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .join-qr { margin: 0; text-align: center; }
 .qr { display: block; width: min(45vh, 30vw); height: min(45vh, 30vw); min-width: 200px; min-height: 200px; }
-.join-url { font-size: clamp(28px, 2.6vw, 52px); font-weight: 700; overflow-wrap: anywhere; }
-.join-count { font-size: clamp(24px, 2vw, 40px); margin-top: var(--space-2) !important; }
+.join-url { font-size: clamp(22px, 2vw, 40px); font-weight: 700; white-space: nowrap; }
+.join-count { font-size: clamp(24px, 2vw, 40px); margin-top: var(--space-1) !important; }
+.join-panel + * { margin-top: var(--space-2); }
+.stage > .btn-main { margin-top: var(--space-2); }
 .join-count strong { font-size: clamp(36px, 3.2vw, 64px); }
 .seat-grid { grid-column: 1 / -1; list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; }
 .seat-grid li {
   padding: 4px 0;
   text-align: center;
   font-size: clamp(20px, 1.4vw, 28px);
-  border: 2px dashed var(--border);
-  border-radius: 8px;
-  color: #9aa0a8;
+  background: var(--surface);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
 }
-.seat-grid .seat-in { border: 2px solid var(--primary); background: var(--primary); color: var(--primary-text); font-weight: 700; }
+.seat-grid .seat-in { border: 1px solid var(--primary); background: var(--primary); color: var(--primary-text); font-weight: 700; }
 @media (max-width: 700px) {
   .join-panel { grid-template-columns: 1fr; }
   .join-code-huge { font-size: 72px; }
@@ -568,7 +570,6 @@ td .badge { margin-left: var(--space-1); }
 .peer-note p:first-child { font-weight: 700; }
 
 /* 上課小工具 */
-.tag { display: inline-block; margin-left: 6px; padding: 0 6px; font-size: 0.8em; font-weight: 700; color: #7a3fb0; border: 1px solid #7a3fb0; border-radius: 4px; vertical-align: 2px; }
 .quick-types { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-1); }
 .quick-type { min-height: 72px; font-size: 24px; padding: 0 var(--space-1); }
 .stepper { display: flex; align-items: center; gap: var(--space-1); font-size: 22px; }
@@ -590,17 +591,18 @@ td .badge { margin-left: var(--space-1); }
 .notice-text { margin: 0; font-weight: 700; color: var(--warning); }
 .timer-presets { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-1); }
 .timer-preset { min-height: 64px; font-size: 24px; }
-.timer { display: flex; align-items: center; gap: var(--space-1); margin-left: auto; padding: 4px var(--space-1) 4px var(--space-2); border: 3px solid var(--primary); border-radius: var(--radius); }
+.timer { display: flex; align-items: center; gap: var(--space-1); margin-left: auto; padding: 2px var(--space-1) 2px var(--space-2); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
 .timer-clock { min-width: 3.2em; font-size: clamp(36px, 3.6vw, 64px); font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; text-align: center; }
 .timer-done { border-color: var(--danger); background: var(--danger-soft); color: var(--danger); }
-.timeup-overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: var(--space-3); background: rgba(0, 0, 0, 0.6); }
+.timeup-overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: var(--space-3); background: var(--overlay); }
 .timeup-card { display: grid; gap: var(--space-3); justify-items: center; width: min(90vw, 900px); padding: var(--space-4); background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-lg); }
 .timeup-card p { margin: 0; }
 .timeup-text { font-size: clamp(96px, 14vw, 220px); font-weight: 700; line-height: 1.1; color: var(--danger); }
 .timeup-card .btn-main { min-width: 360px; }
 
 /* 搶答: fills the lesson screen (projected). Under 時間到 (z-index 100), over dialogs. */
-.buzz-screen { position: fixed; inset: 0; z-index: 20; display: grid; grid-template-rows: 1fr auto auto auto; gap: var(--space-2); padding: var(--space-3) var(--space-4); background: var(--surface); }
+.buzz-screen { position: fixed; inset: 0; z-index: 20; display: grid; grid-template-rows: auto 1fr auto auto auto; gap: var(--space-2); padding: 0 var(--space-4) var(--space-3); background: var(--surface); }
+.buzz-bar { display: flex; align-items: center; min-height: 56px; margin: 0 calc(-1 * var(--space-4)); padding: 0 2.5vw; background: var(--appbar); color: var(--appbar-text); font-size: clamp(20px, 1.6vw, 30px); font-weight: 700; }
 .buzz-main { display: grid; place-items: center; min-height: 0; overflow: auto; }
 .buzz-big { margin: 0; font-size: clamp(120px, 22vh, 260px); font-weight: 700; line-height: 1; }
 .buzz-countdown { color: var(--primary); font-variant-numeric: tabular-nums; }
