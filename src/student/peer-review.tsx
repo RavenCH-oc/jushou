@@ -15,7 +15,7 @@ export function Reviewing({ code, current, onRefresh }: { code: string; current:
 
   if (!task) {
     return (
-      <div class="stack center">
+      <div class="card student-card stack center">
         <p class="big-status">同學互評中</p>
         <p class="wait">{current.answer === null ? "這題你沒有作答，這次不用互評，等老師下一步" : "這次沒有分配到你評，等老師下一步"}</p>
       </div>
@@ -23,7 +23,7 @@ export function Reviewing({ code, current, onRefresh }: { code: string; current:
   }
   if (task.deleted) {
     return (
-      <div class="stack center">
+      <div class="card student-card stack center">
         <p class="big-status">同學互評中</p>
         <p class="wait">老師刪除了你這則評語，這題不用再評，等老師下一步</p>
       </div>
@@ -46,7 +46,7 @@ export function Reviewing({ code, current, onRefresh }: { code: string; current:
   };
 
   return (
-    <div class="stack">
+    <div class="card student-card stack">
       <h1 class="review-title">請評這位同學的答案</h1>
       <p class="muted">
         第 {current.number} 題：{current.question.text}
@@ -73,10 +73,11 @@ export function Reviewing({ code, current, onRefresh }: { code: string; current:
           id="review-comment"
           class="field review-comment"
           rows={4}
+          maxLength={REVIEW_MAX_LENGTH}
           value={comment}
           onInput={(e) => setComment(e.currentTarget.value)}
         />
-        <p class={`review-count${left < 0 ? " error" : ""}`}>{left >= 0 ? `還可以寫 ${left} 字` : `超過 ${-left} 字，請刪短一點`}</p>
+        <p class={`review-count${left < 0 ? " error" : left <= 20 ? " review-count-low" : ""}`}>{left >= 0 ? `還可以寫 ${left} 字` : `超過 ${-left} 字，請刪短一點`}</p>
       </div>
       {error && (
         <p class="error" role="alert">

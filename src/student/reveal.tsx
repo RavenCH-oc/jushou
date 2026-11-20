@@ -26,14 +26,16 @@ export function Reveal({ current }: { current: StudentCurrent }) {
         </span>
         {label}
       </p>
-      {result.score !== null && (
-        <p class="verdict-score">
-          得 {result.score}／{question.points} 分
-        </p>
-      )}
-      <p class="muted">第 {current.number} 題</p>
-      <p class="reveal-text">{question.text}</p>
-      <CorrectAnswer question={question} answer={current.answer} blanks={result.blanks} />
+      <div class="card student-card stack">
+        {result.score !== null && (
+          <p class="verdict-score">
+            得 {result.score}／{question.points} 分
+          </p>
+        )}
+        <p class="muted">第 {current.number} 題</p>
+        <p class="reveal-text">{question.text}</p>
+        <CorrectAnswer question={question} answer={current.answer} blanks={result.blanks} />
+      </div>
     </div>
   );
 }
@@ -50,12 +52,14 @@ function Unscored({ current, question: q }: { current: StudentCurrent; question:
       <p class="verdict verdict-unscored" role="status">
         這題不計分
       </p>
-      <p class="muted">第 {current.number} 題</p>
-      {q.text && <p class="reveal-text">{q.text}</p>}
-      <dl class="reveal-list">
-        <dt>你的答案</dt>
-        <dd>{mine}</dd>
-      </dl>
+      <div class="card student-card stack">
+        <p class="muted">第 {current.number} 題</p>
+        {q.text && <p class="reveal-text">{q.text}</p>}
+        <dl class="reveal-list">
+          <dt>你的答案</dt>
+          <dd>{mine}</dd>
+        </dl>
+      </div>
     </div>
   );
 }
@@ -86,7 +90,7 @@ function CorrectAnswer({ question: q, answer, blanks }: { question: Question; an
                 <span class="reveal-option-text">{text}</span>
                 <span class="reveal-tags">
                   {correct && <strong>✓ 正確答案</strong>}
-                  {picked.includes(i) && <span>你選的</span>}
+                  {picked.includes(i) && <span class="badge badge-neutral">你選的</span>}
                 </span>
               </li>
             );
