@@ -40,6 +40,9 @@
   /* 長條圖一般選項 */
   --chart: #6b7a99;
 
+  /* 對話框和「時間到」後面的遮罩 */
+  --overlay: rgba(15, 22, 35, 0.55);
+
   /* 陰影與圓角 */
   --shadow: 0 1px 3px rgba(20, 30, 50, 0.10);
   --shadow-lg: 0 8px 24px rgba(20, 30, 50, 0.18);
@@ -187,7 +190,7 @@ label { display: block; font-weight: 700; margin-bottom: var(--space-1); }
   border-radius: var(--radius-sm);
 }
 
-/* Small status label: .badge (warning), .badge-success, .badge-neutral */
+/* Small status label: .badge (warning), .badge-success, .badge-accent, .badge-neutral */
 .badge {
   display: inline-block;
   padding: 2px 10px;
@@ -199,4 +202,5 @@ label { display: block; font-weight: 700; margin-bottom: var(--space-1); }
   white-space: nowrap;
 }
 .badge-success { background: var(--success-soft); color: var(--success); }
+.badge-accent { background: var(--primary-soft); color: var(--primary); }
 .badge-neutral { background: var(--surface-soft); color: var(--text-muted); }

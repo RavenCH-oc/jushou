@@ -76,6 +76,7 @@ export function BuzzScreen(props: { lessonId: string; poke: { current: () => voi
 
   return (
     <div class="buzz-screen" role="dialog" aria-modal="true" aria-label="搶答">
+      <div class="buzz-bar">搶答</div>
       <div class="buzz-main" aria-live="polite">
         {body}
       </div>

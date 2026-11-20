@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { encode } from "uqr";
 import { api } from "./api";
 import { go, href } from "./router";
-import { AppBar, Confirm, ErrorText, Loading, Modal, useAction, useLoad } from "./ui";
+import { AppBar, Capped, Confirm, ErrorText, Loading, Modal, useAction, useLoad } from "./ui";
 import { OfflineNote, useLive } from "../student/live";
 import { QuestionText, QuestionView } from "../student/question-view";
 import { toStudentView } from "../shared/grading";
@@ -46,12 +46,12 @@ export function StartLesson({ classId }: { classId: string }) {
       <main class="page narrow">
         <h1>開始上課</h1>
         {active && (
-          <p class="notice">
+          <p class="card notice-card">
             「{active.className}」正在上課。<a href={href(`/lesson/${active.id}`)}>回到那堂課</a>
           </p>
         )}
         <div class="stack-lg">
-          <fieldset class="choices">
+          <fieldset class="card choices">
             <legend>1. 哪一班？</legend>
             {classes.length === 0 && <p class="muted">還沒有班級，請先回首頁新增班級。</p>}
             {classes.map((c) => (
@@ -64,7 +64,7 @@ export function StartLesson({ classId }: { classId: string }) {
               </label>
             ))}
           </fieldset>
-          <fieldset class="choices">
+          <fieldset class="card choices">
             <legend>2. 用哪一份題組？</legend>
             <label class={`choice${set === "none" ? " choice-on" : ""}`}>
               <input type="radio" name="set" checked={set === "none"} onChange={() => setSet("none")} />
@@ -73,15 +73,23 @@ export function StartLesson({ classId }: { classId: string }) {
               </span>
             </label>
             {sets.length === 0 && <p class="muted">還沒有題組。要用題組的話，請先回首頁新增。</p>}
-            {sets.map((s) => (
-              <label key={s.id} class={`choice${set === s.id ? " choice-on" : ""}`}>
-                <input type="radio" name="set" checked={set === s.id} disabled={!s.questionCount} onChange={() => setSet(s.id)} />
-                <span>
-                  {s.name}
-                  <span class="muted">　{s.questionCount ? `${s.questionCount} 題` : "（還沒有題目）"}</span>
-                </span>
-              </label>
-            ))}
+            {/* Newest first; the chosen one is never hidden behind 「顯示全部」. */}
+            <Capped
+              items={sets}
+              noun="個題組"
+              listClass="choices-list"
+              moreClass="choices-more"
+              keepOpen={sets.findIndex((x) => x.id === set) >= 5}
+              row={(s) => (
+                <label class={`choice${set === s.id ? " choice-on" : ""}`}>
+                  <input type="radio" name="set" checked={set === s.id} disabled={!s.questionCount} onChange={() => setSet(s.id)} />
+                  <span>
+                    {s.name}
+                    <span class="muted">　{s.questionCount ? `${s.questionCount} 題` : "（還沒有題目）"}</span>
+                  </span>
+                </label>
+              )}
+            />
           </fieldset>
           <ErrorText message={action.error} />
           <button
@@ -89,7 +97,7 @@ export function StartLesson({ classId }: { classId: string }) {
             disabled={!cls || !set || action.busy}
             onClick={() => (active ? setConfirmEnd(true) : action.run(start))}
           >
-            {action.busy ? "準備中…" : "開始"}
+            {action.busy ? "準備中…" : "開始上課"}
           </button>
         </div>
         {confirmEnd && active && (
@@ -112,6 +120,12 @@ export function StartLesson({ classId }: { classId: string }) {
 // --- The lesson screen ---
 
 const STATUS_LABEL = { pending: "未出題", open: "作答中", closed: "已停止作答", reviewing: "互評中", revealed: "已公布答案" };
+
+// Same tags on the question list and the stage; 未出題 is just muted text.
+function StatusTag({ status }: { status: LessonQuestion["status"] }) {
+  const cls = { open: "badge badge-success", closed: "badge", reviewing: "badge badge-accent", revealed: "badge badge-neutral", pending: "" }[status];
+  return cls ? <span class={cls}>{STATUS_LABEL[status]}</span> : <span class="muted lesson-pending">{STATUS_LABEL[status]}</span>;
+}
 
 type Dialog =
   | { kind: "join" }
@@ -270,16 +284,27 @@ export function LessonPage({ id }: { id: string }) {
 
   return (
     <main class="lesson">
-      <header class="lesson-bar">
-        <div class="lesson-head">
-          <a class="back" href={href("/")}>
-            ← 回首頁（課會繼續進行）
-          </a>
-          <h1 class="lesson-title">
-            {lesson.className}・{lesson.setName}
-          </h1>
-          {timerState && <TimerDisplay timer={timerState} onChange={setTimerState} onClose={() => setTimerState(null)} />}
+      <header class="lesson-appbar">
+        <a class="appbar-link" href={href("/")}>
+          ‹ 回首頁（課會繼續進行）
+        </a>
+        <h1 class="lesson-title">
+          {lesson.className}・{lesson.setName}
+        </h1>
+        <div class="appbar-actions">
+          <button class="appbar-button" onClick={() => setDialog({ kind: "join" })}>
+            加入碼
+          </button>
+          <button class="appbar-button" onClick={() => setDialog({ kind: "roster" })}>
+            名單（{joined.length}）
+          </button>
+          <FullscreenButton />
+          <button class="appbar-button" onClick={() => setDialog({ kind: "end" })}>
+            結束上課
+          </button>
         </div>
+      </header>
+      <div class="lesson-body">
         <div class="lesson-tools">
           <div class="row">
             <button class="btn btn-secondary" onClick={() => setDialog({ kind: "quick" })}>
@@ -295,101 +320,93 @@ export function LessonPage({ id }: { id: string }) {
               計時器
             </button>
           </div>
-          <div class="row">
-            <button class="btn btn-secondary" onClick={() => setDialog({ kind: "join" })}>
-              加入碼
-            </button>
-            <button class="btn btn-secondary" onClick={() => setDialog({ kind: "roster" })}>
-              名單（{joined.length}）
-            </button>
-            <FullscreenButton />
-            <button class="btn btn-secondary" onClick={() => setDialog({ kind: "end" })}>
-              結束上課
-            </button>
-          </div>
+          {timerState && <TimerDisplay timer={timerState} onChange={setTimerState} onClose={() => setTimerState(null)} />}
         </div>
-      </header>
 
-      {!currentId || !q ? (
-        <section class="stack-lg">
-          <JoinPanel lesson={lesson} />
-          <ErrorText message={action.error} />
-          <button class="btn btn-block btn-main" disabled={action.busy} onClick={main.run}>
-            {main.label}
-          </button>
-        </section>
-      ) : (
-        <div class="lesson-grid">
-          <ol class="lesson-list">
-            {questions.map((x, i) => (
-              <li key={x.id}>
-                <button class={`lesson-item${x === q ? " lesson-item-on" : ""}`} aria-current={x === q} onClick={() => setFocusId(x.id)}>
-                  <span>
-                    {i + 1}. {x.text.replace(/\s+/g, " ").slice(0, 20) || ORAL_LABEL}
-                    {x.quick && <span class="tag">臨時</span>}
-                  </span>
-                  <span class={`lesson-status status-${x.status}`}>{STATUS_LABEL[x.status]}</span>
-                </button>
-              </li>
-            ))}
-          </ol>
-          <section class="lesson-main">
-            <p class="lesson-meta">
-              第 {index + 1} 題・{q.quick ? "臨時出題・" : ""}
-              {typeLabel(q.type)}・{q.points} 分　<strong class={`status-${q.status}`}>{STATUS_LABEL[q.status]}</strong>
-            </p>
-            {q.status === "pending" || q.status === "open" ? (
-              <div class="projected">
-                <QuestionView q={toStudentView(q)} oral={ORAL_LABEL} />
-              </div>
-            ) : (
-              <div class="projected">
-                <QuestionText q={toStudentView(q)} oral={ORAL_LABEL} />
-              </div>
-            )}
-            {needsAnswer && <AnswerPicker q={q} pick={picked} onPick={setPick} />}
-            {(q.status === "closed" || q.status === "revealed") && (
-              <Results
-                q={q}
-                revealed={q.status === "revealed"}
-                onEssays={() => setDialog({ kind: "essay-warn", q })}
-                onReviews={showReviews}
-              />
-            )}
-            {q.status === "reviewing" && q.review && (
-              <div class="results">
-                <p class="review-progress">
-                  互評中，已完成 <strong>{q.review.done}</strong>／{q.review.total} 人
-                </p>
-                <div>
-                  <button class="btn btn-secondary" onClick={showReviews}>
-                    看評語
+        {!currentId || !q ? (
+          <section class="card stage">
+            <JoinPanel lesson={lesson} />
+            <ErrorText message={action.error} />
+            <button class="btn btn-block btn-main" disabled={action.busy} onClick={main.run}>
+              {main.label}
+            </button>
+          </section>
+        ) : (
+          <div class="lesson-grid">
+            <ol class="card panel lesson-list">
+              {questions.map((x, i) => (
+                <li key={x.id}>
+                  <button class={`lesson-item${x === q ? " lesson-item-on" : ""}`} aria-current={x === q} onClick={() => setFocusId(x.id)}>
+                    {/* Not asked yet: no text, so the projector doesn't give away what's coming. */}
+                    <span class="lesson-item-text">
+                      {i + 1}. {x.status === "pending" ? typeLabel(x.type) : x.text.replace(/\s+/g, " ").slice(0, 20) || ORAL_LABEL}
+                    </span>
+                    <span class="lesson-item-tags">
+                      <StatusTag status={x.status} />
+                      {x.quick && <span class="badge badge-neutral">臨時</span>}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ol>
+            <section class="card stage lesson-main">
+              <p class="lesson-meta">
+                第 {index + 1} 題・{q.quick ? "臨時出題・" : ""}
+                {typeLabel(q.type)}・{q.points} 分 <StatusTag status={q.status} />
+              </p>
+              {q.status === "pending" || q.status === "open" ? (
+                <div class="projected">
+                  <QuestionView q={toStudentView(q)} oral={ORAL_LABEL} />
+                </div>
+              ) : (
+                <div class="projected">
+                  <QuestionText q={toStudentView(q)} oral={ORAL_LABEL} />
+                </div>
+              )}
+              {needsAnswer && <AnswerPicker q={q} pick={picked} onPick={setPick} />}
+              {(q.status === "closed" || q.status === "revealed") && (
+                <Results
+                  q={q}
+                  revealed={q.status === "revealed"}
+                  onEssays={() => setDialog({ kind: "essay-warn", q })}
+                  onReviews={showReviews}
+                />
+              )}
+              {q.status === "reviewing" && q.review && (
+                <div class="results">
+                  <p class="review-progress">
+                    互評中，已完成 <strong>{q.review.done}</strong>／{q.review.total} 人
+                  </p>
+                  <div>
+                    <button class="btn btn-secondary" onClick={showReviews}>
+                      看評語
+                    </button>
+                  </div>
+                </div>
+              )}
+              <ErrorText message={action.error} />
+              {note && <p class="muted">{note}</p>}
+              <div class="lesson-foot">
+                {q.status !== "pending" && q.status !== "reviewing" && (
+                  <p class="answered">
+                    已作答 <strong>{q.stats.answered}</strong>／{joined.length} 人
+                  </p>
+                )}
+                <div class="lesson-actions">
+                  {extra.map((x) => (
+                    <button key={x.label} class="btn btn-secondary" disabled={action.busy} onClick={x.run}>
+                      {x.label}
+                    </button>
+                  ))}
+                  <button class="btn btn-main" disabled={action.busy || main.disabled} onClick={main.run}>
+                    {main.label}
                   </button>
                 </div>
               </div>
-            )}
-            <ErrorText message={action.error} />
-            {note && <p class="muted">{note}</p>}
-            <div class="lesson-foot">
-              {q.status !== "pending" && q.status !== "reviewing" && (
-                <p class="answered">
-                  已作答 <strong>{q.stats.answered}</strong>／{joined.length} 人
-                </p>
-              )}
-              <div class="lesson-actions">
-                {extra.map((x) => (
-                  <button key={x.label} class="btn btn-secondary" disabled={action.busy} onClick={x.run}>
-                    {x.label}
-                  </button>
-                ))}
-                <button class="btn btn-main" disabled={action.busy || main.disabled} onClick={main.run}>
-                  {main.label}
-                </button>
-              </div>
-            </div>
-          </section>
-        </div>
-      )}
+            </section>
+          </div>
+        )}
+      </div>
       <OfflineNote connected={connected} />
       {lesson.buzzOpen && (
         <BuzzScreen
@@ -405,45 +422,47 @@ export function LessonPage({ id }: { id: string }) {
       {dialog?.kind === "join" && (
         <Modal title="加入碼" full onClose={close}>
           <JoinPanel lesson={lesson} />
-          <button class="btn btn-block" onClick={close}>
+          <button class="btn btn-secondary btn-block" onClick={close}>
             關閉
           </button>
         </Modal>
       )}
       {dialog?.kind === "roster" && (
         <Modal wide title={`名單：已加入 ${joined.length}／${lesson.students.length} 人`} onClose={close}>
-          <table class="table">
-            <thead>
-              <tr>
-                <th>座號</th>
-                <th>姓名</th>
-                <th>狀態</th>
-                {q && <th>第 {index + 1} 題</th>}
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {lesson.students.map((s) => (
-                <tr key={s.id}>
-                  <td>{s.seat}</td>
-                  <td>{s.name}</td>
-                  <td>{s.joined ? "已加入" : <span class="muted">未加入</span>}</td>
-                  {q && <td>{q.answeredBy.includes(s.id) ? "已交" : <span class="muted">未交</span>}</td>}
-                  <td>
-                    {s.bound && (
-                      <button
-                        class="btn btn-secondary btn-small"
-                        onClick={() => setDialog({ kind: "unbind", id: s.id, label: `${s.seat} 號 ${s.name}` })}
-                      >
-                        解除綁定
-                      </button>
-                    )}
-                  </td>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>座號</th>
+                  <th>姓名</th>
+                  <th>狀態</th>
+                  {q && <th>第 {index + 1} 題</th>}
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          <button class="btn btn-block" onClick={close}>
+              </thead>
+              <tbody>
+                {lesson.students.map((s) => (
+                  <tr key={s.id}>
+                    <td>{s.seat}</td>
+                    <td>{s.name}</td>
+                    <td>{s.joined ? "已加入" : <span class="muted">未加入</span>}</td>
+                    {q && <td>{q.answeredBy.includes(s.id) ? "已交" : <span class="muted">未交</span>}</td>}
+                    <td>
+                      {s.bound && (
+                        <button
+                          class="btn-text btn-text-danger"
+                          onClick={() => setDialog({ kind: "unbind", id: s.id, label: `${s.seat} 號 ${s.name}` })}
+                        >
+                          解除綁定
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <button class="btn btn-secondary btn-block" onClick={close}>
             關閉
           </button>
         </Modal>
@@ -532,7 +551,7 @@ export function LessonPage({ id }: { id: string }) {
                 </div>
                 {r.score !== null && (
                   <button
-                    class="btn btn-secondary btn-small"
+                    class="btn-text btn-text-danger"
                     onClick={() => setDialog({ kind: "delete-review", q: dialog.q, item: r, list: dialog.list })}
                   >
                     刪除
@@ -541,7 +560,7 @@ export function LessonPage({ id }: { id: string }) {
               </li>
             ))}
           </ul>
-          <button class="btn btn-block" onClick={close}>
+          <button class="btn btn-secondary btn-block" onClick={close}>
             關閉
           </button>
         </Modal>
@@ -586,7 +605,7 @@ export function LessonPage({ id }: { id: string }) {
               </li>
             ))}
           </ul>
-          <button class="btn btn-block" onClick={close}>
+          <button class="btn btn-secondary btn-block" onClick={close}>
             關閉
           </button>
         </Modal>
@@ -605,7 +624,7 @@ function FullscreenButton() {
   if (!document.fullscreenEnabled) return null;
   const toggle = () => (on ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
   return (
-    <button class="btn btn-secondary" onClick={toggle}>
+    <button class="appbar-button" onClick={toggle}>
       {on ? "離開全螢幕" : "全螢幕"}
     </button>
   );
@@ -619,13 +638,13 @@ function JoinPanel({ lesson }: { lesson: LessonDetail }) {
         <p class="join-label">用手機掃描 QR code，</p>
         <p class="join-label">或打開下面的網址，輸入加入碼</p>
         <p class="join-code-huge">{lesson.joinCode}</p>
+        <p class="join-url">{location.host}</p>
         <p class="join-count">
           已加入 <strong>{joined}</strong>／{lesson.students.length} 人
         </p>
       </div>
       <figure class="join-qr">
         <QrCode text={`${location.origin}/?code=${lesson.joinCode}`} />
-        <figcaption class="join-url">{location.host}</figcaption>
       </figure>
       <ul class="seat-grid" aria-label="已加入的座號">
         {lesson.students.map((s) => (
