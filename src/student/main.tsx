@@ -65,32 +65,48 @@ function JoinForm({ error, onJoined }: { error: string; onJoined: (code: string)
   };
 
   return (
-    <main class="page narrow">
-      <h1>舉手</h1>
-      <form class="stack" onSubmit={submit}>
-        <div>
-          <label for="code">輸入老師給的加入碼</label>
-          <input
-            id="code"
-            class="field code-field"
-            inputMode="numeric"
-            autoComplete="off"
-            maxLength={6}
-            placeholder="6 位數字"
-            value={code}
-            onInput={(e) => setCode(e.currentTarget.value.replace(/\D/g, ""))}
-          />
-        </div>
-        {message && (
-          <p class="error" role="alert">
-            {message}
-          </p>
-        )}
-        <button class="btn btn-block" type="submit" disabled={busy || code.length !== 6}>
-          {busy ? "加入中…" : "加入"}
-        </button>
-      </form>
-    </main>
+    <>
+      <StudentBar title="舉手" />
+      <main class="page narrow student">
+        <form class="card student-card stack" onSubmit={submit}>
+          <div>
+            <label for="code">輸入老師給的加入碼</label>
+            <input
+              id="code"
+              class="field code-field"
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={6}
+              placeholder="6 位數字"
+              value={code}
+              onInput={(e) => setCode(e.currentTarget.value.replace(/\D/g, ""))}
+            />
+          </div>
+          {message && (
+            <p class="error" role="alert">
+              {message}
+            </p>
+          )}
+          <button class="btn btn-block" type="submit" disabled={busy || code.length !== 6}>
+            {busy ? "加入中…" : "加入"}
+          </button>
+        </form>
+      </main>
+    </>
+  );
+}
+
+// Thin dark bar: the class (or 舉手) and, once picked, who this phone is. No links.
+function StudentBar({ title, me }: { title: string; me?: { seat: number; name: string } | null }) {
+  return (
+    <header class="student-bar">
+      <span class="student-bar-title">{title}</span>
+      {me && (
+        <span class="student-bar-me">
+          {me.seat} 號 {me.name}
+        </span>
+      )}
+    </header>
   );
 }
 
@@ -132,18 +148,23 @@ function Classroom({ code, onLeave }: { code: string; onLeave: (message?: string
 
   if (!state) {
     return (
-      <main class="page narrow stack">
-        {error ? (
-          <>
-            <p class="error">{error}</p>
-            <button class="btn btn-block" onClick={refresh}>
-              再試一次
-            </button>
-          </>
-        ) : (
-          <p>載入中…</p>
-        )}
-      </main>
+      <>
+        <StudentBar title="舉手" />
+        <main class="page narrow student">
+          <div class="card student-card stack">
+            {error ? (
+              <>
+                <p class="error">{error}</p>
+                <button class="btn btn-block" onClick={refresh}>
+                  再試一次
+                </button>
+              </>
+            ) : (
+              <p>載入中…</p>
+            )}
+          </div>
+        </main>
+      </>
     );
   }
 
@@ -163,44 +184,41 @@ function Classroom({ code, onLeave }: { code: string; onLeave: (message?: string
   else if (!state.current) screen = <Waiting me={state.me} onNotMe={notMe} />;
   else {
     const current = state.current;
-    screen = (
-      <>
-        <p class="who">
-          {state.me.seat} 號 {state.me.name}
-        </p>
-        {current.status === "open" ? (
-          <Answering key={current.question.id} code={code} current={current} onRefresh={refresh} />
-        ) : current.status === "closed" ? (
-          <Stopped current={current} />
-        ) : current.status === "reviewing" ? (
-          <Reviewing key={current.question.id} code={code} current={current} onRefresh={refresh} />
-        ) : (
-          <Reveal current={current} />
-        )}
-      </>
-    );
+    screen =
+      current.status === "open" ? (
+        <Answering key={current.question.id} code={code} current={current} onRefresh={refresh} />
+      ) : current.status === "closed" ? (
+        <Stopped current={current} />
+      ) : current.status === "reviewing" ? (
+        <Reviewing key={current.question.id} code={code} current={current} onRefresh={refresh} />
+      ) : (
+        <Reveal current={current} />
+      );
   }
 
   return (
-    <main class="page narrow student">
-      {!remembers && <p class="notice">請不要關閉這個分頁。關掉後要重新選座號。</p>}
-      {error && (
-        <p class="error" role="alert">
-          {error}
-        </p>
-      )}
-      {/* 搶答 covers the screen without unmounting it, so a half-written answer is still
-          there (and can still be sent) when the round ends. */}
-      <div hidden={!!state.buzz}>{screen}</div>
-      {state.buzz && <BuzzView key={state.buzz.round} code={code} buzz={state.buzz} onRefresh={refresh} />}
-      <OfflineNote connected={connected} />
-    </main>
+    <>
+      <StudentBar title={state.className} me={state.me} />
+      <main class="page narrow student">
+        {!remembers && <p class="notice">請不要關閉這個分頁。關掉後要重新選座號。</p>}
+        {error && (
+          <p class="error" role="alert">
+            {error}
+          </p>
+        )}
+        {/* 搶答 covers the screen without unmounting it, so a half-written answer is still
+            there (and can still be sent) when the round ends. */}
+        <div hidden={!!state.buzz}>{screen}</div>
+        {state.buzz && <BuzzView key={state.buzz.round} code={code} buzz={state.buzz} onRefresh={refresh} />}
+        <OfflineNote connected={connected} />
+      </main>
+    </>
   );
 }
 
 function NoLesson({ className, ended, onLeave }: { className: string; ended: boolean; onLeave: () => void }) {
   return (
-    <div class="stack center">
+    <div class="card student-card stack center">
       <p class="muted">{className}</p>
       {ended ? <p class="big-status">這堂課結束了，謝謝！</p> : <p class="big-status">老師還沒開始上課，請稍等</p>}
       {!ended && <p class="muted">老師開始上課後，這個畫面會自動換過去。</p>}
@@ -224,7 +242,7 @@ const RESULT_LABEL = {
 // 下課: how this student did on each question of today's last lesson.
 function LessonResultView({ result, onLeave }: { result: LessonResult; onLeave: () => void }) {
   return (
-    <div class="stack">
+    <div class="card student-card stack">
       <p class="big-status center">這堂課結束了，謝謝！</p>
       <p class="muted center">{result.setName}</p>
       {result.max > 0 && (
@@ -272,7 +290,7 @@ function SeatPicker({ code, state, onBound }: { code: string; state: StudentStat
   };
 
   return (
-    <div>
+    <div class="card student-card">
       <h1>{state.className}</h1>
       <p>請點你的座號和名字</p>
       <ul class="seat-list">
@@ -281,7 +299,7 @@ function SeatPicker({ code, state, onBound }: { code: string; state: StudentStat
             <button class={`seat-button${s.taken ? " seat-taken" : ""}`} disabled={busy} onClick={() => pick(s.seat, s.taken)}>
               <span class="seat-no">{s.seat}</span>
               <span class="seat-name">{s.name}</span>
-              {s.taken && <span class="seat-note">已有人使用</span>}
+              {s.taken && <span class="badge badge-neutral">已有人使用</span>}
             </button>
             {message?.seat === s.seat && (
               <p class="error" role="alert">
@@ -297,7 +315,7 @@ function SeatPicker({ code, state, onBound }: { code: string; state: StudentStat
 
 function Waiting({ me, onNotMe }: { me: { seat: number; name: string }; onNotMe: () => void }) {
   return (
-    <div class="stack center">
+    <div class="card student-card stack center">
       <p class="big-status">
         {me.seat} 號 {me.name}，已加入
       </p>
@@ -338,7 +356,9 @@ function Answering({ code, current, onRefresh }: { code: string; current: Studen
 
   return (
     <div class="stack">
-      <QuestionView q={current.question} number={current.number} answer={draft} onAnswer={setDraft} />
+      <div class="card student-card">
+        <QuestionView q={current.question} number={current.number} answer={draft} onAnswer={setDraft} />
+      </div>
       {error && (
         <p class="error" role="alert">
           {error}
@@ -361,7 +381,7 @@ function Answering({ code, current, onRefresh }: { code: string; current: Studen
 
 function Stopped({ current }: { current: StudentCurrent }) {
   return (
-    <div class="stack">
+    <div class="card student-card stack">
       <p class="big-status">老師已停止作答</p>
       <p class="muted">{current.answer === null ? "你這題沒有作答。" : "你送出的答案："}</p>
       <fieldset class="locked" disabled>

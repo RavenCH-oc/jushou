@@ -40,7 +40,7 @@ export function BuzzView({ code, buzz, onRefresh }: { code: string; buzz: Buzz; 
   };
 
   return (
-    <div class="stack center buzz">
+    <div class="card student-card stack center buzz">
       <p class="big-status">搶答</p>
       {rank !== null ? (
         <p class="buzz-rank" role="status">
