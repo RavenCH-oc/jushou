@@ -253,7 +253,7 @@ function LessonResultView({ result, onLeave }: { result: LessonResult; onLeave: 
       <ol class="result-list">
         {result.items.map((item) => (
           <li key={item.number} class={`result-item result-${item.result}`}>
-            <span class="result-snippet truncate">
+            <span class="result-snippet">
               {item.number}. {item.snippet}
             </span>
             <span class="result-mark">

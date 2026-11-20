@@ -125,8 +125,9 @@
   padding: var(--space-1) 4px;
   border-bottom: 1px solid var(--border);
 }
-.result-snippet { flex: 1; min-width: 0; }
-.result-mark { flex: none; font-weight: 700; }
+/* Up to two lines of the question, then 「…」; the result stays on one line. */
+.result-snippet { flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.result-mark { flex: none; font-weight: 700; white-space: nowrap; }
 .result-correct .result-mark { color: var(--success); }
 .result-wrong .result-mark { color: var(--danger); }
 .result-hidden .result-mark, .result-unanswered .result-mark, .result-unscored .result-mark { color: var(--text-muted); font-weight: 400; }
